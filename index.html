@@ -1,0 +1,1327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Salma Rahba Rehabilitation Medicine – Hospital Rounding System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet" />
+<style>
+  /* ── Reset & Base ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --blue-deep:   #7b1f2e;
+    --blue-mid:    #9b2335;
+    --blue-lite:   #b83245;
+    --blue-bg:     #fdf4f5;
+    --blue-pale:   #fdf0f1;
+    --blue-border: #f0cdd1;
+    --blue-soft:   #fad5d9;
+    --text-dark:   #2d1417;
+    --text-mid:    #3d1e22;
+    --text-muted:  #9b6670;
+    --text-faint:  #b08088;
+    --white:       #ffffff;
+    --sidebar-bg:  #fdf7f7;
+    --radius-lg: 14px;
+    --radius-md: 10px;
+    --radius-sm: 8px;
+    --shadow-card: 0 2px 10px rgba(120,30,40,0.07);
+    --font-body: 'DM Sans', sans-serif;
+    --font-display: 'DM Serif Display', serif;
+  }
+  html, body { height: 100%; font-family: var(--font-body); background: var(--blue-bg); color: var(--text-dark); }
+  button { font-family: var(--font-body); cursor: pointer; }
+  input, select, textarea { font-family: var(--font-body); }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #e8c0c5; border-radius: 10px; }
+
+  /* ── Layout ── */
+  #app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+  /* ── Header ── */
+  #header {
+    background: linear-gradient(135deg, var(--blue-deep) 0%, var(--blue-mid) 60%, var(--blue-lite) 100%);
+    height: 58px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 20px; gap: 12px;
+    box-shadow: 0 2px 12px rgba(123,31,46,0.22);
+  }
+  .hdr-brand { display: flex; align-items: center; gap: 12px; }
+  .hdr-icon { width: 32px; height: 32px; border-radius: 8px; background: rgba(255,255,255,0.18); display: flex; align-items: center; justify-content: center; font-size: 18px; }
+  .hdr-title { font-family: var(--font-display); font-size: 14px; color: #fff; }
+  .hdr-sub { font-size: 10px; color: rgba(255,255,255,0.65); letter-spacing: 0.08em; text-transform: uppercase; }
+  .hdr-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .hdr-btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 13px; border-radius: 8px;
+    border: 1.5px solid rgba(255,255,255,0.35);
+    background: rgba(255,255,255,0.12); color: #fff;
+    font-size: 12px; font-weight: 600; transition: opacity 0.15s;
+  }
+  .hdr-btn:hover { opacity: 0.8; }
+  .hdr-date { font-size: 12px; color: rgba(255,255,255,0.75); }
+  .hdr-avatar { width: 32px; height: 32px; border-radius: 50%; background: rgba(255,255,255,0.22); display: flex; align-items: center; justify-content: center; font-size: 13px; color: #fff; font-weight: 700; }
+
+  /* ── Body ── */
+  #body { display: flex; flex: 1; overflow: hidden; }
+
+  /* ── Sidebar ── */
+  #sidebar { width: 300px; flex-shrink: 0; background: var(--sidebar-bg); border-right: 1px solid var(--blue-border); display: flex; flex-direction: column; overflow: hidden; }
+  .sidebar-top { padding: 14px 14px 10px; }
+  .sidebar-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .sidebar-label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.09em; }
+  .btn-add-patient { display: flex; align-items: center; gap: 5px; background: linear-gradient(135deg, var(--blue-deep), var(--blue-mid)); color: #fff; border: none; border-radius: 8px; padding: 5px 12px; font-size: 12px; font-weight: 700; }
+  .search-input { width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid #edcacf; background: #fff; font-size: 12px; color: var(--text-mid); outline: none; transition: border-color 0.15s; }
+  .search-input:focus { border-color: var(--blue-mid); box-shadow: 0 0 0 3px rgba(155,35,53,0.12); }
+  #patient-list { overflow-y: auto; flex: 1; padding-bottom: 10px; }
+  .empty-list { padding: 24px 14px; text-align: center; color: var(--text-faint); font-size: 13px; }
+  .sidebar-footer { padding: 10px 14px; border-top: 1px solid var(--blue-border); font-size: 11px; color: var(--text-muted); background: var(--sidebar-bg); }
+
+  /* ── Ward Section ── */
+  .ward-section { border-bottom: 1px solid var(--blue-border); }
+  .ward-header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 9px 14px; cursor: pointer;
+    background: var(--sidebar-bg); border: none; width: 100%; text-align: left;
+    transition: background 0.12s;
+  }
+  .ward-header:hover { background: #fae8ea; }
+  .ward-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .ward-name { font-size: 12px; font-weight: 700; color: var(--text-dark); flex: 1; }
+  .ward-count { font-size: 10px; font-weight: 700; color: var(--text-muted); background: #f5d5d8; border-radius: 20px; padding: 1px 7px; }
+  .ward-chevron { font-size: 10px; color: var(--text-faint); }
+  .ward-patients { display: block; }
+  .ward-patients.collapsed { display: none; }
+  .priority-section { border-bottom: 2px solid #f5b8c0; }
+  .priority-header { background: linear-gradient(90deg,#fdf0f1,#fdf7f7) !important; }
+  .priority-header:hover { background: #fae8ea !important; }
+  .urgent-section { border-bottom: 2px solid #fca5a5; }
+  .urgent-header { background: linear-gradient(90deg,#fff1f1,#fdf7f7) !important; }
+  .urgent-header:hover { background: #fee2e2 !important; }
+  .urgent-badge { font-size: 11px; font-weight: 700; background: #dc2626; color: #fff; border-radius: 6px; padding: 2px 8px; }
+  .priority-toggle-urgent { width: 100%; padding: 8px 11px; border-radius: 8px; font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px; border: 1.5px solid #edcacf; background: #fdf8f8; color: #b08088; cursor: pointer; transition: all 0.15s; }
+  .priority-toggle-urgent.on { border-color: #dc2626; background: #dc2626; color: #fff; }
+
+  /* ── Patient Row ── */
+  .patient-row {
+    padding: 11px 14px; border-left: 3px solid transparent;
+    cursor: pointer; border-bottom: 1px solid #e6f0fa;
+    background: var(--sidebar-bg); transition: background 0.12s;
+    position: relative;
+  }
+  .patient-row:hover { background: #fae8ea; }
+  .patient-row.active { background: var(--blue-soft) !important; border-left-color: var(--blue-mid) !important; }
+  .row-top { display: flex; justify-content: space-between; align-items: flex-start; }
+  .row-room { font-size: 11px; font-weight: 700; color: var(--blue-mid); background: var(--blue-soft); border-radius: 5px; padding: 1px 6px; }
+  .row-name { font-weight: 600; font-size: 13px; color: var(--text-dark); margin-top: 5px; }
+  .row-mrn { font-size: 11px; color: #b08088; margin-top: 2px; }
+  .row-bottom { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; }
+  .row-therapist { font-size: 11px; color: var(--text-muted); }
+  .row-done { font-size: 10px; color: var(--text-faint); }
+  .row-done.complete { color: #16a34a; }
+  .row-actions { position: absolute; bottom: 8px; right: 10px; display: none; gap: 5px; }
+  .patient-row:hover .row-actions { display: flex; }
+  .row-edit-btn { padding: 3px 9px; border-radius: 6px; border: 1px solid #edcacf; background: #fdf0f1; color: var(--blue-mid); font-size: 11px; font-weight: 600; }
+  .row-edit-btn:hover { background: #f7d5d8; }
+  .row-arch-btn { padding: 3px 9px; border-radius: 6px; border: 1px solid #fecaca; background: #fff5f5; color: #dc2626; font-size: 11px; font-weight: 600; }
+  .row-arch-btn:hover { background: #fee2e2; }
+  .row-del-btn { padding: 3px 8px; border-radius: 6px; border: 1px solid #fca5a5; background: #dc2626; color: #fff; font-size: 11px; font-weight: 700; }
+  .row-del-btn:hover { background: #b91c1c; }
+
+  /* ── Classification Badge ── */
+  .cls-badge { font-size: 10px; font-weight: 600; border-radius: 5px; padding: 2px 7px; }
+  .cls-ABM { background: #fad5d9; color: #7b1f2e; }
+  .cls-LC  { background: #dcfce7; color: #166534; }
+  .cls-LTC { background: #fef9c3; color: #854d0e; }
+  .cls-SSR { background: #fce7f3; color: #9d174d; }
+  .cls-PAR { background: #ede9fe; color: #5b21b6; }
+
+  /* ── Ward Colors ── */
+  .ward-dot-warda  { background: #7b1f2e; }
+  .ward-dot-wardb  { background: #10b981; }
+  .ward-dot-icu1   { background: #f59e0b; }
+  .ward-dot-icu2   { background: #ef4444; }
+  .ward-badge { font-size: 10px; font-weight: 700; border-radius: 5px; padding: 2px 7px; }
+  .ward-badge-warda { background: #fad5d9; color: #7b1f2e; }
+  .ward-badge-wardb { background: #d1fae5; color: #065f46; }
+  .ward-badge-icu1  { background: #fef3c7; color: #92400e; }
+  .ward-badge-icu2  { background: #fee2e2; color: #991b1b; }
+
+  /* ── Main ── */
+  #main { flex: 1; overflow-y: auto; padding: 20px 24px; }
+  .empty-main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
+  .empty-main .big-icon { font-size: 48px; }
+  .empty-main p { font-size: 15px; color: var(--text-muted); }
+
+  /* ── Patient Header Card ── */
+  .patient-card {
+    background: #fff; border-radius: var(--radius-lg); padding: 18px 22px;
+    border: 1px solid #f5d5d8; box-shadow: var(--shadow-card);
+    margin-bottom: 18px; display: flex; justify-content: space-between;
+    align-items: center; flex-wrap: wrap; gap: 12px;
+  }
+  .patient-card-left { display: flex; align-items: center; gap: 16px; }
+  .patient-avatar { width: 50px; height: 50px; border-radius: 50%; background: linear-gradient(135deg,#f5b8c0,#ee9aaa); display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700; color: var(--blue-deep); flex-shrink: 0; }
+  .patient-fullname { font-family: var(--font-display); font-size: 22px; color: var(--text-dark); }
+  .priority-badge { font-size: 11px; font-weight: 700; background: #fee2e2; color: #dc2626; border-radius: 6px; padding: 2px 8px; }
+  .patient-meta { display: flex; gap: 14px; margin-top: 3px; flex-wrap: wrap; }
+  .patient-meta span { font-size: 12px; color: var(--text-muted); }
+  .patient-card-right { display: flex; align-items: center; gap: 10px; }
+  .edit-patient-btn { display: flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 9px; border: 1.5px solid #edcacf; background: #fdf0f1; color: var(--blue-mid); font-size: 12px; font-weight: 600; }
+  .edit-patient-btn:hover { background: #f7d5d8; }
+
+  /* ── Checklist ── */
+  .checklist-card { background: #fff; border-radius: var(--radius-lg); border: 1px solid #f5d5d8; box-shadow: var(--shadow-card); margin-bottom: 18px; overflow: hidden; }
+  .card-header { padding: 12px 20px; background: linear-gradient(90deg,#fdf0f1,#fdf8f8); border-bottom: 1px solid #f5d5d8; display: flex; align-items: center; gap: 8px; }
+  .card-header-label { font-weight: 700; font-size: 13px; color: #7b1f2e; letter-spacing: 0.03em; }
+  .checklist-items { display: flex; gap: 14px; padding: 16px 20px; flex-wrap: wrap; }
+  .checklist-divider { display: flex; align-items: center; gap: 10px; padding: 8px 20px; background: linear-gradient(90deg,#fdf0f1,#fdf8f8); border-top: 1px solid #f0cdd1; border-bottom: 1px solid #f0cdd1; font-size: 12px; font-weight: 700; color: #7b1f2e; letter-spacing: 0.04em; }
+
+  /* Equipment toggle buttons */
+  .equip-btn {
+    display: flex; align-items: center; gap: 8px;
+    padding: 9px 14px; border-radius: 10px;
+    border: 1.5px solid #edcacf; background: #fdf8f8;
+    cursor: pointer; font-family: var(--font-body);
+    transition: all 0.15s; position: relative;
+  }
+  .equip-btn:hover { background: #faeaec; border-color: #d4929c; }
+  .equip-btn.checked { border-color: #9b2335; background: linear-gradient(135deg,#fad5d9,#fff8f8); }
+  .equip-icon { font-size: 16px; }
+  .equip-label { font-size: 12px; font-weight: 600; color: #3d1e22; }
+  .equip-btn.checked .equip-label { color: #7b1f2e; }
+  .equip-check { font-size: 11px; font-weight: 700; color: #9b2335; background: #fad5d9; border-radius: 20px; padding: 1px 7px; margin-left: 2px; }
+  .equip-others-input { width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #edcacf; outline: none; font-size: 13px; color: #3d1e22; background: #fdf8f8; font-family: var(--font-body); transition: border-color 0.15s; }
+  .equip-others-input:focus { border-color: #9b2335; box-shadow: 0 0 0 3px rgba(155,35,53,0.10); }
+  .check-btn {
+    flex: 1; min-width: 140px; padding: 14px 16px; border-radius: 12px;
+    border: 2px solid #f5d5d8; background: #fdf8f8; text-align: left;
+    display: flex; align-items: center; gap: 12px; transition: all 0.15s;
+  }
+  .check-btn.checked { border-color: var(--blue-mid); background: linear-gradient(135deg,#fad5d9,#fdf0f1); }
+  .check-btn:hover { transform: scale(1.02); }
+  .check-box { width: 28px; height: 28px; border-radius: 8px; background: #f5d5d8; display: flex; align-items: center; justify-content: center; font-size: 14px; color: #fff; transition: background 0.15s; flex-shrink: 0; }
+  .check-btn.checked .check-box { background: var(--blue-mid); }
+  .check-label { font-weight: 600; font-size: 13px; color: #64748b; }
+  .check-btn.checked .check-label { color: var(--blue-deep); }
+  .check-sub { font-size: 10px; color: var(--text-faint); margin-top: 1px; }
+  .check-btn.checked .check-sub { color: var(--blue-lite); }
+
+  /* ── Note Section ── */
+  .notes-wrap { display: flex; flex-direction: column; gap: 14px; }
+  .note-card { background: #fff; border-radius: 12px; border: 1px solid #f5d5d8; overflow: hidden; box-shadow: 0 1px 4px rgba(123,31,46,0.06); }
+  .note-header { display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: linear-gradient(90deg,#fdf0f1,#fdf8f8); border-bottom: 1px solid #f5d5d8; }
+  .note-header-label { font-weight: 600; font-size: 13px; color: #7b1f2e; letter-spacing: 0.03em; }
+  .note-count { margin-left: auto; font-size: 11px; color: var(--text-muted); background: #fae8ea; border-radius: 20px; padding: 2px 9px; }
+  .note-input-area { padding: 12px 16px 0; }
+  .note-textarea { width: 100%; min-height: 80px; padding: 10px 12px; border-radius: 8px; border: 1.5px solid #edcacf; outline: none; resize: vertical; font-size: 13px; color: var(--text-mid); background: #fdf8f8; line-height: 1.7; transition: border-color 0.15s; }
+  .note-textarea:focus { border-color: var(--blue-mid); box-shadow: 0 0 0 3px rgba(155,35,53,0.12); }
+  .note-save-row { display: flex; justify-content: flex-end; padding: 8px 16px 12px; }
+  .note-save-btn { padding: 6px 18px; border-radius: 8px; border: none; background: #edcacf; color: #fff; font-size: 12px; font-weight: 700; letter-spacing: 0.03em; transition: background 0.15s; }
+  .note-save-btn.active { background: linear-gradient(135deg, var(--blue-deep), var(--blue-mid)); cursor: pointer; }
+  .note-history { border-top: 1px solid #fae8ea; }
+  .note-history-label { padding: 8px 16px 4px; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.07em; }
+  .note-entry { border-top: 1px solid #fdf0f1; }
+  /* Row showing timestamp + action buttons */
+  .note-entry-header { display: flex; align-items: center; gap: 8px; padding: 9px 16px; background: none; }
+  .note-entry-header:hover { background: #fdf8f8; }
+  .note-entry-ts { font-size: 11px; color: var(--blue-lite); font-weight: 600; flex: 1; cursor: pointer; line-height: 1.5; }
+  .note-entry-ts .edited-tag { color: var(--text-faint); font-weight: 400; font-size: 10px; display: block; margin-top: 1px; }
+  .note-entry-actions { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+  .ne-btn { padding: 3px 9px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; border: 1px solid transparent; }
+  .ne-btn-view { border-color: #edcacf; background: #fdf0f1; color: var(--blue-mid); }
+  .ne-btn-view:hover { background: #f7d5d8; }
+  .ne-btn-edit { border-color: #edcacf; background: #fdf0f1; color: var(--blue-mid); }
+  .ne-btn-edit:hover { background: #f7d5d8; }
+  .ne-btn-del { border-color: #fecaca; background: #fff5f5; color: #dc2626; }
+  .ne-btn-del:hover { background: #fee2e2; }
+  /* View body */
+  .note-entry-body { padding: 10px 16px 14px; font-size: 13px; color: var(--text-mid); line-height: 1.7; white-space: pre-wrap; background: #fdf8f8; border-top: 1px dashed #f5d5d8; display: none; }
+  .note-entry-body.open { display: block; }
+  /* Edit area */
+  .note-entry-edit-area { padding: 10px 16px 14px; background: #fdf0f1; border-top: 1px solid #f5b8c0; display: none; }
+  .note-entry-edit-area.open { display: block; }
+  .note-edit-textarea { width: 100%; min-height: 90px; padding: 10px 12px; border-radius: 8px; border: 1.5px solid #ee9aaa; outline: none; resize: vertical; font-size: 13px; color: var(--text-mid); background: #fff; line-height: 1.7; font-family: var(--font-body); }
+  .note-edit-textarea:focus { border-color: var(--blue-mid); box-shadow: 0 0 0 3px rgba(155,35,53,0.12); }
+  .note-edit-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+  .note-edit-cancel { padding: 5px 14px; border-radius: 7px; border: 1.5px solid #edcacf; background: #fff; color: var(--text-muted); font-size: 12px; font-weight: 600; cursor: pointer; font-family: var(--font-body); }
+  .note-edit-cancel:hover { background: #fdf0f1; }
+  .note-edit-save-btn { padding: 5px 16px; border-radius: 7px; border: none; background: linear-gradient(135deg,var(--blue-deep),var(--blue-mid)); color: #fff; font-size: 12px; font-weight: 700; cursor: pointer; font-family: var(--font-body); }
+  .note-edit-save-btn:hover { opacity: 0.9; }
+  /* Delete confirm inline */
+  .note-delete-confirm { padding: 10px 16px 14px; background: #fff5f5; border-top: 1px solid #fecaca; display: none; align-items: center; justify-content: space-between; gap: 12px; }
+  .note-delete-confirm.open { display: flex; }
+  .note-delete-msg { font-size: 12px; color: #dc2626; font-weight: 600; }
+  .note-delete-actions { display: flex; gap: 7px; flex-shrink: 0; }
+  .btn-del-cancel { padding: 4px 12px; border-radius: 6px; border: 1px solid #edcacf; background: #fff; color: var(--text-muted); font-size: 12px; font-weight: 600; cursor: pointer; font-family: var(--font-body); }
+  .btn-del-cancel:hover { background: #fdf0f1; }
+  .btn-del-confirm { padding: 4px 12px; border-radius: 6px; border: none; background: #dc2626; color: #fff; font-size: 12px; font-weight: 700; cursor: pointer; font-family: var(--font-body); }
+  .btn-del-confirm:hover { background: #b91c1c; }
+
+  /* ── Reply Thread ── */
+  .reply-thread { background: #fdf7f7; border-top: 1px solid #f0cdd1; padding: 0 16px 8px 32px; }
+  .reply-entry { padding: 8px 0 6px; border-bottom: 1px dashed #f0cdd1; }
+  .reply-entry:last-child { border-bottom: none; }
+  .reply-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .reply-icon { font-size: 13px; }
+  .reply-ts { font-size: 10px; color: #b83245; font-weight: 600; flex: 1; }
+  .reply-del-btn { font-size: 10px; padding: 1px 7px; border-radius: 5px; border: 1px solid #fecaca; background: #fff5f5; color: #dc2626; cursor: pointer; font-weight: 600; font-family: var(--font-body); }
+  .reply-del-btn:hover { background: #fee2e2; }
+  .reply-text { font-size: 12px; color: #3d1e22; line-height: 1.65; white-space: pre-wrap; }
+  /* Reply input area */
+  .reply-input-area { display: none; background: #fdf0f1; border-top: 1px solid #f5d5d8; padding: 10px 16px 12px 32px; }
+  .reply-input-area.open { display: block; }
+  .reply-textarea { width: 100%; min-height: 60px; padding: 8px 10px; border-radius: 8px; border: 1.5px solid #edcacf; outline: none; resize: vertical; font-size: 12px; color: #3d1e22; background: #fff; line-height: 1.6; font-family: var(--font-body); }
+  .reply-textarea:focus { border-color: #9b2335; box-shadow: 0 0 0 3px rgba(155,35,53,0.10); }
+  .reply-actions { display: flex; justify-content: flex-end; gap: 7px; margin-top: 7px; }
+  .reply-cancel-btn { padding: 4px 12px; border-radius: 7px; border: 1.5px solid #edcacf; background: #fff; color: #9b6670; font-size: 11px; font-weight: 600; cursor: pointer; font-family: var(--font-body); }
+  .reply-cancel-btn:hover { background: #fdf0f1; }
+  .reply-submit-btn { padding: 4px 14px; border-radius: 7px; border: none; background: linear-gradient(135deg,#7b1f2e,#9b2335); color: #fff; font-size: 11px; font-weight: 700; cursor: pointer; font-family: var(--font-body); }
+  .reply-submit-btn:hover { opacity: 0.88; }
+  .ne-btn-reply { border-color: #edcacf; background: #fdf0f1; color: #7b1f2e; }
+  .ne-btn-reply:hover { background: #f7d5d8; }
+
+  /* ── Modal Overlay ── */
+  .modal-overlay { position: fixed; inset: 0; z-index: 1000; background: rgba(45,20,23,0.45); display: flex; align-items: center; justify-content: center; }
+  .modal-box { background: #fff; border-radius: 18px; box-shadow: 0 20px 60px rgba(123,31,46,0.22); overflow: hidden; width: min(490px, 96vw); }
+  .modal-box.wide { width: min(540px, 96vw); }
+  .modal-box.archive-box { width: min(520px, 96vw); max-height: 80vh; display: flex; flex-direction: column; }
+  .modal-head { background: linear-gradient(135deg, var(--blue-deep), var(--blue-mid)); padding: 16px 22px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+  .modal-title { font-family: var(--font-display); font-size: 19px; color: #fff; }
+  .modal-close { background: rgba(255,255,255,0.18); border: none; border-radius: 8px; color: #fff; font-size: 20px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .modal-close:hover { background: rgba(255,255,255,0.28); }
+  .modal-body { padding: 22px 24px; display: flex; flex-direction: column; gap: 15px; }
+  .modal-body.scroll { overflow-y: auto; flex: 1; }
+  .form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .field-label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.07em; display: block; margin-bottom: 5px; }
+  .field-input { width: 100%; padding: 8px 11px; border-radius: 8px; border: 1.5px solid #edcacf; font-size: 13px; color: var(--text-dark); outline: none; background: #fdf8f8; transition: border-color 0.15s; }
+  .field-input:focus { border-color: var(--blue-mid); box-shadow: 0 0 0 3px rgba(155,35,53,0.12); }
+  .priority-toggle { width: 100%; padding: 8px 11px; border-radius: 8px; font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px; border: 1.5px solid #edcacf; background: #fdf8f8; color: #b08088; cursor: pointer; transition: all 0.15s; }
+  .priority-toggle.on { border-color: #dc2626; background: #fee2e2; color: #dc2626; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 4px; }
+  .btn-cancel { flex: 1; padding: 10px; border-radius: 10px; border: 1.5px solid #edcacf; background: #fdf8f8; color: var(--text-muted); font-size: 13px; font-weight: 600; cursor: pointer; }
+  .btn-cancel:hover { background: #fdf0f1; }
+  .btn-primary { flex: 2; padding: 10px; border-radius: 10px; border: none; background: linear-gradient(135deg, var(--blue-deep), var(--blue-mid)); color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .btn-primary:hover { opacity: 0.9; }
+  .btn-primary:disabled { background: #e8c0c5; cursor: not-allowed; }
+  .btn-danger { flex: 1; padding: 10px; border-radius: 10px; border: none; background: linear-gradient(135deg,#dc2626,#ef4444); color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .btn-danger:hover { opacity: 0.9; }
+
+  /* ── Archive Modal ── */
+  .archive-search-bar { padding: 16px 20px; border-bottom: 1px solid #f5d5d8; flex-shrink: 0; }
+  .archive-list { overflow-y: auto; flex: 1; }
+  .archive-empty { padding: 32px; text-align: center; color: var(--text-faint); font-size: 13px; }
+  .archive-row { padding: 14px 20px; border-bottom: 1px solid #fdf0f1; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .archive-name { font-weight: 600; font-size: 14px; color: var(--text-dark); }
+  .archive-meta { font-size: 12px; color: #b08088; margin-top: 2px; }
+  .archive-ts { font-size: 11px; color: var(--text-faint); margin-top: 2px; }
+  .btn-restore { padding: 7px 16px; border-radius: 9px; border: none; background: linear-gradient(135deg,var(--blue-deep),var(--blue-mid)); color: #fff; font-size: 12px; font-weight: 700; cursor: pointer; flex-shrink: 0; }
+  .btn-restore:hover { opacity: 0.9; }
+
+  /* ── Sheet Info Box ── */
+  .info-box { background: #fdf0f1; border-radius: 10px; padding: 14px 16px; font-size: 12px; color: #9b2335; line-height: 1.8; }
+
+  /* ── Toast ── */
+  #toast { position: fixed; top: 20px; right: 24px; z-index: 2000; border-radius: 12px; padding: 12px 20px; font-size: 13px; font-weight: 600; box-shadow: 0 8px 24px rgba(0,0,0,0.18); color: #fff; display: none; max-width: 340px; }
+
+  /* ── Delete confirm ── */
+  .confirm-box { padding: 30px 28px 24px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 0; }
+  .confirm-icon { font-size: 38px; margin-bottom: 12px; }
+  .confirm-title { font-family: var(--font-display); font-size: 19px; color: var(--text-dark); margin-bottom: 8px; }
+  .confirm-msg { font-size: 13px; color: var(--text-muted); line-height: 1.6; margin-bottom: 6px; }
+  .confirm-sub { font-size: 12px; color: var(--text-faint); margin-bottom: 24px; }
+
+  /* ── Badge on archive btn ── */
+  .badge { background: #fbbf24; color: #2d1417; border-radius: 20px; padding: 0px 6px; font-size: 10px; font-weight: 700; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- HEADER -->
+  <header id="header">
+    <div class="hdr-brand">
+      <div class="hdr-icon">🏥</div>
+      <div>
+        <div class="hdr-title">Salma Rahba Rehabilitation Medicine</div>
+        <div class="hdr-sub">Hospital Rounding System</div>
+      </div>
+    </div>
+    <div class="hdr-actions">
+      <button class="hdr-btn" onclick="openSheetModal()">🔗 Google Sheet <span id="sync-indicator"></span></button>
+      <button class="hdr-btn" id="sync-now-btn" onclick="syncNow()" style="display:none">🔄 Sync Now</button>
+      <button class="hdr-btn" onclick="openArchiveModal()">🗄️ Archive <span class="badge" id="archive-count" style="display:none"></span></button>
+      <span class="hdr-date" id="hdr-date"></span>
+      <div class="hdr-avatar">DR</div>
+    </div>
+  </header>
+
+  <!-- BODY -->
+  <div id="body">
+
+    <!-- SIDEBAR -->
+    <aside id="sidebar">
+      <div class="sidebar-top">
+        <div class="sidebar-header">
+          <span class="sidebar-label">Patients</span>
+          <button class="btn-add-patient" onclick="openAddModal()">+ Add</button>
+        </div>
+        <input class="search-input" type="text" placeholder="Search name, room, MRN…" oninput="onSearch(this.value)" />
+      </div>
+      <div id="patient-list"></div>
+      <div class="sidebar-footer" id="sidebar-footer"></div>
+    </aside>
+
+    <!-- MAIN -->
+    <div id="main"></div>
+
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- MODALS -->
+<div id="modal-overlay" class="modal-overlay" style="display:none" onclick="handleOverlayClick(event)">
+  <div id="modal-content"></div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════════════
+const LS = {
+  get: (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+
+const CLASSIFICATIONS = ["ABM","LC","LTC","SSR","PAR"];
+
+let state = {
+  patients: LS.get("cr_patients", defaultPatients()),
+  archive:  LS.get("cr_archive", []),
+  selected: null,
+  search:   "",
+  sheetUrl: LS.get("cr_sheet_url", ""),
+  syncStatus: "idle",
+};
+state.selected = state.patients[0]?.id ?? null;
+
+function defaultPatients() {
+  const eq = {bariatricWheelchair:false,comfortWheelchair:false,highframeWalker:false,hoist:false,medicalBed:false,sling:false,standardWalker:false,standardWheelchair:false,wheeledWalker:false};
+  return [
+    mkPatient(1,"101A","Margaret Collins","MRN-004821","Dr. Rivera","ABM",true,{stable:false,unstable:false,...eq},"Ward A"),
+    mkPatient(2,"102B","James Thornton","MRN-007345","Dr. Patel","LC",false,{stable:false,unstable:false,...eq},"Ward A"),
+    mkPatient(3,"104A","Sandra Okafor","MRN-003198","Dr. Kim","LTC",true,{stable:true,unstable:false,...eq},"Ward B"),
+    mkPatient(4,"107C","Robert Nguyen","MRN-009012","Dr. Rivera","SSR",false,{stable:false,unstable:true,...eq},"ICU 1"),
+    mkPatient(5,"110B","Linda Ramirez","MRN-001567","Dr. Patel","PAR",false,{stable:true,unstable:false,bariatricWheelchair:false,comfortWheelchair:true,highframeWalker:false,hoist:false,medicalBed:false,sling:false,standardWalker:false,standardWheelchair:false,wheeledWalker:false},"ICU 2"),
+  ];
+}
+
+function mkPatient(id,room,name,mrn,primaryPt,cls,hp=false,checklist={stable:false,unstable:false,bariatricWheelchair:false,comfortWheelchair:false,highframeWalker:false,hoist:false,medicalBed:false,sling:false,standardWalker:false,standardWheelchair:false,wheeledWalker:false},ward="Ward A",primaryOt="",primarySlp="") {
+  return { id, room, name, mrn, primaryPt, primaryOt, primarySlp, classification: cls, highPriority: hp, isUrgent: false, checklist, ward, equipOthers:"",
+    physicianNotes:"", roundNotes:"", ptNotes:"", otNotes:"", slpNotes:"",
+    physicianHistory:[], roundHistory:[], ptHistory:[], otHistory:[], slpHistory:[] };
+}
+
+function save() {
+  LS.set("cr_patients", state.patients);
+  LS.set("cr_archive",  state.archive);
+  LS.set("cr_sheet_url", state.sheetUrl);
+}
+
+function getSelected() { return state.patients.find(p => p.id === state.selected); }
+
+function updatePatient(id, changes) {
+  state.patients = state.patients.map(p => p.id === id ? { ...p, ...changes } : p);
+  save();
+}
+
+// ════════════════════════════════════════════════
+//  RENDER
+// ════════════════════════════════════════════════
+function render() {
+  renderHeader();
+  renderSidebar();
+  renderMain();
+}
+
+function renderHeader() {
+  document.getElementById("hdr-date").textContent =
+    new Date().toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});
+  document.getElementById("sync-now-btn").style.display = state.sheetUrl ? "" : "none";
+  const ind = document.getElementById("sync-indicator");
+  ind.textContent = state.syncStatus === "syncing" ? " ⏳" : state.syncStatus === "ok" ? " ✓" : state.syncStatus === "error" ? " ⚠️" : "";
+  const ac = document.getElementById("archive-count");
+  if (state.archive.length > 0) { ac.style.display = ""; ac.textContent = state.archive.length; }
+  else { ac.style.display = "none"; }
+}
+
+const WARDS = [
+  { id: "Ward A", label: "Ward A", dotCls: "ward-dot-warda", badgeCls: "ward-badge-warda" },
+  { id: "Ward B", label: "Ward B", dotCls: "ward-dot-wardb", badgeCls: "ward-badge-wardb" },
+  { id: "ICU 1",  label: "ICU 1",  dotCls: "ward-dot-icu1",  badgeCls: "ward-badge-icu1"  },
+  { id: "ICU 2",  label: "ICU 2",  dotCls: "ward-dot-icu2",  badgeCls: "ward-badge-icu2"  },
+];
+
+function wardKey(wardId) { return wardId.toLowerCase().replace(/\s+/g,""); }
+function wardBadgeClass(wardId) { return "ward-badge ward-badge-" + wardKey(wardId); }
+function wardDotClass(wardId)   { return "ward-dot ward-dot-" + wardKey(wardId); }
+
+// Track which wards are collapsed (default all open)
+const collapsedWards = new Set();
+
+function toggleWard(wardId) {
+  if (collapsedWards.has(wardId)) collapsedWards.delete(wardId);
+  else collapsedWards.add(wardId);
+  renderSidebar();
+}
+
+function renderSidebar() {
+  const q = state.search.toLowerCase();
+  const filtered = state.patients.filter(p =>
+    p.name.toLowerCase().includes(q) ||
+    p.room.toLowerCase().includes(q) ||
+    p.mrn.toLowerCase().includes(q) ||
+    (p.ward||"").toLowerCase().includes(q)
+  );
+
+  const list = document.getElementById("patient-list");
+  const hp = state.patients.filter(p => p.highPriority).length;
+  const urg = state.patients.filter(p => p.isUrgent).length;
+
+  if (filtered.length === 0) {
+    list.innerHTML = `<div class="empty-list">No patients found.</div>`;
+    document.getElementById("sidebar-footer").textContent =
+      `${state.patients.length} patient${state.patients.length!==1?"s":""} · ${urg} urgent · ${hp} priority`;
+    return;
+  }
+
+  const buildRow = (p) => {
+    const isAct = p.id === state.selected;
+    const done = Object.values(p.checklist).filter(Boolean).length;
+    return `
+      <div class="patient-row${isAct?" active":""}" onclick="selectPatient(${p.id})">
+        <div class="row-top">
+          <div style="display:flex;align-items:center;gap:7px">
+            <span class="row-room">${esc(p.room)}</span>
+            ${p.isUrgent ? "<span title='Urgent' style='font-size:13px'>🔴</span>" : ""}
+            ${p.highPriority ? "<span title='Priority' style='font-size:13px'>🚩</span>" : ""}
+            ${p.checklist.unstable ? "<span title='Unstable' style='font-size:13px'>⚠️</span>" : ""}
+          </div>
+          <span class="cls-badge cls-${p.classification}">${p.classification}</span>
+        </div>
+        <div class="row-name">${esc(p.name)}</div>
+        <div class="row-mrn">${esc(p.mrn)}</div>
+        <div class="row-bottom">
+          <span class="row-therapist">${esc(p.primaryPt||"")}</span>
+          <span class="row-done${done===3?" complete":""}">${done}/3</span>
+        </div>
+        <div class="row-actions">
+          <button class="row-edit-btn" onclick="event.stopPropagation();openEditModal(${p.id})">✏️ Edit</button>
+          <button class="row-arch-btn" onclick="event.stopPropagation();openArchiveConfirm(${p.id})">Archive</button>
+          <button class="row-del-btn" onclick="event.stopPropagation();openDeleteConfirm(${p.id})">🗑️</button>
+        </div>
+      </div>`;
+  };
+
+  const sortByRoom = arr => [...arr].sort((a,b) => {
+    const nA = parseInt(a.room)||0, nB = parseInt(b.room)||0;
+    if (nA !== nB) return nA - nB;
+    return a.room.localeCompare(b.room);
+  });
+
+  let html = "";
+
+  // ── Urgent group (top) ──
+  const urgentPatients = sortByRoom(filtered.filter(p => p.isUrgent));
+  const isUrgentCollapsed = collapsedWards.has("__urgent__");
+  if (urgentPatients.length > 0) {
+    html += `
+      <div class="ward-section urgent-section">
+        <button class="ward-header urgent-header" onclick="toggleWard('__urgent__')">
+          <span style="font-size:14px">🔴</span>
+          <span class="ward-name" style="color:#dc2626">Urgent</span>
+          <span class="ward-count" style="background:#fee2e2;color:#991b1b">${urgentPatients.length}</span>
+          <span class="ward-chevron">${isUrgentCollapsed?"▶":"▼"}</span>
+        </button>
+        <div class="ward-patients${isUrgentCollapsed?" collapsed":""}">
+          ${urgentPatients.map(buildRow).join("")}
+        </div>
+      </div>`;
+  }
+
+  // ── Priority group ──
+  const priorityPatients = sortByRoom(filtered.filter(p => p.highPriority));
+  const isPriorityCollapsed = collapsedWards.has("__priority__");
+  if (priorityPatients.length > 0) {
+    html += `
+      <div class="ward-section priority-section">
+        <button class="ward-header priority-header" onclick="toggleWard('__priority__')">
+          <span style="font-size:14px">🚩</span>
+          <span class="ward-name" style="color:#9b2335">Priority</span>
+          <span class="ward-count" style="background:#fad5d9;color:#7b1f2e">${priorityPatients.length}</span>
+          <span class="ward-chevron">${isPriorityCollapsed?"▶":"▼"}</span>
+        </button>
+        <div class="ward-patients${isPriorityCollapsed?" collapsed":""}">
+          ${priorityPatients.map(buildRow).join("")}
+        </div>
+      </div>`;
+  }
+
+  // ── Ward groups ──
+  WARDS.forEach(ward => {
+    const wardPatients = sortByRoom(filtered.filter(p => (p.ward||"Ward A") === ward.id));
+    const isCollapsed = collapsedWards.has(ward.id);
+    const chevron = isCollapsed ? "▶" : "▼";
+    const allWardCount = state.patients.filter(p => (p.ward||"Ward A") === ward.id).length;
+
+    html += `
+      <div class="ward-section">
+        <button class="ward-header" onclick="toggleWard('${ward.id}')">
+          <span class="ward-dot ${ward.dotCls}"></span>
+          <span class="ward-name">${ward.label}</span>
+          <span class="ward-count">${allWardCount}</span>
+          <span class="ward-chevron">${chevron}</span>
+        </button>
+        <div class="ward-patients${isCollapsed?" collapsed":""}">
+          ${wardPatients.length === 0
+            ? `<div class="empty-list" style="padding:10px 14px;font-size:11px">No patients${q?" matching search":""}</div>`
+            : wardPatients.map(buildRow).join("")
+          }
+        </div>
+      </div>`;
+  });
+
+  list.innerHTML = html;
+  const hpCount = state.patients.filter(p => p.highPriority).length;
+  const urgCount = state.patients.filter(p => p.isUrgent).length;
+  document.getElementById("sidebar-footer").textContent =
+    `${filtered.length} patient${filtered.length!==1?"s":""} · ${urgCount} urgent · ${hpCount} priority`;
+}
+
+function renderMain() {
+  const main = document.getElementById("main");
+  const p = getSelected();
+  if (!p) {
+    main.innerHTML = `
+      <div class="empty-main" style="display:flex">
+        <div class="big-icon">🏥</div>
+        <p>No patients yet.</p>
+        <button class="btn-primary" style="flex:none;padding:10px 22px" onclick="openAddModal()">+ Add First Patient</button>
+      </div>`;
+    return;
+  }
+
+  const initials = p.name.split(" ").map(n=>n[0]).join("").slice(0,2);
+
+  main.innerHTML = `
+    <!-- Patient Header -->
+    <div class="patient-card">
+      <div class="patient-card-left">
+        <div class="patient-avatar">${esc(initials)}</div>
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span class="patient-fullname">${esc(p.name)}</span>
+            ${p.isUrgent ? '<span class="urgent-badge">🔴 URGENT</span>' : ""}
+            ${p.highPriority ? '<span class="priority-badge">🚩 PRIORITY</span>' : ""}
+          </div>
+          <div class="patient-meta">
+            <span>Room ${esc(p.room)}</span>
+            <span>${esc(p.mrn)}</span>
+            ${p.primaryPt ? `<span>🦵 PT: ${esc(p.primaryPt)}</span>` : ""}
+            ${p.primaryOt ? `<span>🖐️ OT: ${esc(p.primaryOt)}</span>` : ""}
+            ${p.primarySlp ? `<span>🗣️ SLP: ${esc(p.primarySlp)}</span>` : ""}
+          </div>
+        </div>
+      </div>
+      <div class="patient-card-right">
+        <button class="edit-patient-btn" onclick="openEditModal(${p.id})">✏️ Edit</button>
+        <span class="${wardBadgeClass(p.ward||'Ward A')}" style="font-size:12px;padding:5px 14px;font-weight:700">${esc(p.ward||"Ward A")}</span>
+        <span class="cls-badge cls-${p.classification}" style="font-size:12px;padding:5px 14px;font-weight:700;letter-spacing:0.05em">${p.classification}</span>
+      </div>
+    </div>
+
+    <!-- Checklist -->
+    <div class="checklist-card">
+      <div class="card-header">
+        <span>📋</span>
+        <span class="card-header-label">ROUNDING CHECKLIST</span>
+      </div>
+      <div class="checklist-items">
+        ${renderCheckItem(p,"stable","Stable","✅","#16a34a","#dcfce7","#166534")}
+        ${renderCheckItem(p,"unstable","Unstable","⚠️","#dc2626","#fee2e2","#991b1b")}
+      </div>
+      <div class="checklist-divider">
+        <span>📦 Equipment Order</span>
+      </div>
+      <div class="checklist-items" style="flex-wrap:wrap;gap:10px">
+        ${renderEquipItem(p,"bariatricWheelchair","Bariatric Wheelchair","♿")}
+        ${renderEquipItem(p,"comfortWheelchair","Comfort Wheelchair","🪑")}
+        ${renderEquipItem(p,"highframeWalker","Highframe Walker","🦯")}
+        ${renderEquipItem(p,"hoist","Hoist","🏗️")}
+        ${renderEquipItem(p,"medicalBed","Medical Bed","🛏️")}
+        ${renderEquipItem(p,"sling","Sling","🩹")}
+        ${renderEquipItem(p,"standardWalker","Standard Walker","🚶")}
+        ${renderEquipItem(p,"standardWheelchair","Standard Wheelchair","🦽")}
+        ${renderEquipItem(p,"wheeledWalker","Wheeled Walker","🛞")}
+      </div>
+      <div style="padding:0 20px 16px">
+        <label style="font-size:11px;font-weight:700;color:#9b6670;text-transform:uppercase;letter-spacing:0.07em;display:block;margin-bottom:6px">Others (free text)</label>
+        <input type="text" class="equip-others-input"
+          id="equip-others-${p.id}"
+          value="${esc(p.equipOthers||"")}"
+          placeholder="e.g. Transfer board, cushion…"
+          oninput="onEquipOthers(${p.id},this.value)" />
+      </div>
+    </div>
+
+    <!-- Notes -->
+    <div class="notes-wrap">
+      ${renderNoteSection(p,"physician","🩺","PHYSICIAN ORDER NOTES","Enter physician orders, prescriptions, or follow-up directives…")}
+      ${renderNoteSection(p,"round","📝","ROUND NOTES","Document rounding observations, patient status, and any immediate concerns…", true)}
+      ${renderNoteSection(p,"pt","🦵","PT NOTES","Record physical therapy sessions, patient response, progress, and goals…", true)}
+      ${renderNoteSection(p,"ot","🖐️","OT NOTES","Record occupational therapy sessions, functional goals, and ADL progress…", true)}
+      ${renderNoteSection(p,"slp","🗣️","SLP NOTES","Record speech-language pathology sessions, communication and swallowing goals…", true)}
+    </div>
+    <div style="height:24px"></div>
+  `;
+}
+
+function renderCheckItem(p, key, label, icon="✓", activeColor="#9b2335", activeBg="#fad5d9", activeText="#7b1f2e") {
+  const checked = p.checklist[key];
+  return `
+    <button class="check-btn${checked?" checked":""}" onclick="toggleCheck(${p.id},'${key}')"
+      style="${checked ? `border-color:${activeColor};background:linear-gradient(135deg,${activeBg},#fff8f8)` : ""}">
+      <div class="check-box" style="${checked ? `background:${activeColor}` : ""}">${checked ? icon : ""}</div>
+      <div>
+        <div class="check-label" style="${checked ? `color:${activeText}` : ""}">${label}</div>
+        <div class="check-sub" style="${checked ? `color:${activeColor}` : ""}">${checked?"Marked":"Tap to mark"}</div>
+      </div>
+    </button>`;
+}
+
+function renderEquipItem(p, key, label, icon) {
+  const checked = p.checklist[key] || false;
+  return `
+    <button class="equip-btn${checked?" checked":""}" onclick="toggleCheck(${p.id},'${key}')">
+      <span class="equip-icon">${icon}</span>
+      <span class="equip-label">${label}</span>
+      ${checked ? '<span class="equip-check">✓</span>' : ""}
+    </button>`;
+}
+
+function renderNoteSection(p, type, icon, title, placeholder, withReplies=false) {
+  const draftKey = type + "Notes";
+  const histKey  = type + "History";
+  const draft = p[draftKey] || "";
+  const history = p[histKey] || [];
+  const hasText = draft.trim().length > 0;
+
+  const histHTML = history.length === 0 ? "" : `
+    <div class="note-history">
+      <div class="note-history-label">Saved Notes</div>
+      ${[...history].reverse().map(n => {
+        const editedLine = n.editedAt
+          ? `<span class="edited-tag">edited ${formatTS(n.editedAt)}</span>` : "";
+        const replies = n.replies || [];
+        const replyThread = replies.length === 0 ? "" : `
+          <div class="reply-thread">
+            ${replies.map(r => `
+              <div class="reply-entry" id="reply-entry-${r.id}">
+                <div class="reply-meta">
+                  <span class="reply-icon">↩️</span>
+                  <span class="reply-ts">Reply · ${formatTS(r.ts)}</span>
+                  <button class="reply-del-btn" onclick="deleteReply(${p.id},'${histKey}',${n.id},${r.id})">✕ Remove</button>
+                </div>
+                <div class="reply-text">${esc(r.text)}</div>
+              </div>`).join("")}
+          </div>`;
+        const replyInputArea = !withReplies ? "" : `
+          <div class="reply-input-area" id="reply-area-${n.id}">
+            <textarea class="reply-textarea" id="reply-ta-${n.id}" placeholder="Write a reply…"></textarea>
+            <div class="reply-actions">
+              <button class="reply-cancel-btn" onclick="cancelReply(${n.id})">Cancel</button>
+              <button class="reply-submit-btn" onclick="submitReply(${p.id},'${histKey}',${n.id})">Post Reply</button>
+            </div>
+          </div>`;
+        return `
+        <div class="note-entry" id="entry-${n.id}">
+          <div class="note-entry-header">
+            <span class="note-entry-ts" onclick="toggleNoteView(${n.id})">
+              🕐 ${formatTS(n.ts)}${editedLine}
+            </span>
+            <div class="note-entry-actions">
+              <button class="ne-btn ne-btn-view" onclick="toggleNoteView(${n.id})" id="view-btn-${n.id}">▼ View</button>
+              ${withReplies ? `<button class="ne-btn ne-btn-reply" onclick="openReplyBox(${n.id})">💬 Reply</button>` : ""}
+              <button class="ne-btn ne-btn-edit" onclick="toggleNoteEditMode(${p.id},'${histKey}',${n.id})">✏️ Edit</button>
+              <button class="ne-btn ne-btn-del" onclick="promptDeleteNote(${p.id},'${histKey}',${n.id})">🗑 Delete</button>
+            </div>
+          </div>
+          <div class="note-entry-body" id="body-${n.id}">${esc(n.text)}</div>
+          ${replyThread}
+          ${replyInputArea}
+          <div class="note-entry-edit-area" id="edit-area-${n.id}">
+            <textarea class="note-edit-textarea" id="edit-ta-${n.id}">${esc(n.text)}</textarea>
+            <div class="note-edit-footer">
+              <button class="note-edit-cancel" onclick="cancelNoteEdit(${p.id},'${histKey}',${n.id})">Cancel</button>
+              <button class="note-edit-save-btn" onclick="commitNoteEdit(${p.id},'${histKey}',${n.id})">Save Changes</button>
+            </div>
+          </div>
+          <div class="note-delete-confirm" id="del-confirm-${n.id}">
+            <span class="note-delete-msg">⚠️ Delete this note permanently?</span>
+            <div class="note-delete-actions">
+              <button class="btn-del-cancel" onclick="cancelDeleteNote(${n.id})">Cancel</button>
+              <button class="btn-del-confirm" onclick="commitDeleteNote(${p.id},'${histKey}',${n.id})">Delete</button>
+            </div>
+          </div>
+        </div>`;
+      }).join("")}
+    </div>`;
+
+  return `
+    <div class="note-card">
+      <div class="note-header">
+        <span>${icon}</span>
+        <span class="note-header-label">${title}</span>
+        ${history.length > 0 ? `<span class="note-count">${history.length} saved ${history.length===1?"note":"notes"}</span>` : ""}
+      </div>
+      <div class="note-input-area">
+        <textarea class="note-textarea" placeholder="${placeholder}"
+          oninput="onNoteInput(${p.id},'${draftKey}',this)"
+          id="textarea-${type}-${p.id}">${esc(draft)}</textarea>
+        <div class="note-save-row">
+          <button class="note-save-btn${hasText?" active":""}" id="savebtn-${type}-${p.id}"
+            onclick="saveNote(${p.id},'${draftKey}','${histKey}')">Save Note</button>
+        </div>
+      </div>
+      ${histHTML}
+    </div>`;
+}
+
+// ── Note view toggle ──
+function toggleNoteView(noteId) {
+  const body = document.getElementById("body-" + noteId);
+  const btn  = document.getElementById("view-btn-" + noteId);
+  const editArea = document.getElementById("edit-area-" + noteId);
+  const delConfirm = document.getElementById("del-confirm-" + noteId);
+  // Don't toggle if edit or delete confirm are open
+  if (editArea?.classList.contains("open") || delConfirm?.classList.contains("open")) return;
+  const isOpen = body.classList.toggle("open");
+  if (btn) btn.textContent = isOpen ? "▲ Hide" : "▼ View";
+}
+
+// ── Note edit mode ──
+function toggleNoteEditMode(patientId, histKey, noteId) {
+  // Close all other open areas across all entries
+  _closeAllNoteExtras(noteId);
+  const body     = document.getElementById("body-" + noteId);
+  const viewBtn  = document.getElementById("view-btn-" + noteId);
+  const editArea = document.getElementById("edit-area-" + noteId);
+  if (!editArea) return;
+  const isOpen = editArea.classList.toggle("open");
+  if (isOpen) {
+    // Close view if open
+    if (body) { body.classList.remove("open"); }
+    if (viewBtn) viewBtn.textContent = "▼ View";
+    // Focus textarea at end
+    const ta = document.getElementById("edit-ta-" + noteId);
+    if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+  }
+}
+
+function cancelNoteEdit(patientId, histKey, noteId) {
+  const editArea = document.getElementById("edit-area-" + noteId);
+  if (editArea) editArea.classList.remove("open");
+  // Restore textarea to saved text
+  const p = state.patients.find(x => x.id === patientId);
+  if (p) {
+    const note = (p[histKey]||[]).find(n => n.id === noteId);
+    if (note) {
+      const ta = document.getElementById("edit-ta-" + noteId);
+      if (ta) ta.value = note.text;
+    }
+  }
+}
+
+function commitNoteEdit(patientId, histKey, noteId) {
+  const ta = document.getElementById("edit-ta-" + noteId);
+  if (!ta) return;
+  const newText = ta.value.trim();
+  if (!newText) { showToast("Note cannot be empty.", "#dc2626"); return; }
+  const p = state.patients.find(x => x.id === patientId);
+  if (!p) return;
+  updatePatient(patientId, {
+    [histKey]: (p[histKey]||[]).map(n =>
+      n.id === noteId ? { ...n, text: newText, editedAt: new Date().toISOString() } : n
+    )
+  });
+  renderMain();
+  showToast("Note updated ✓", "#16a34a");
+}
+
+// ── Note delete ──
+function promptDeleteNote(patientId, histKey, noteId) {
+  _closeAllNoteExtras(noteId);
+  // Close view body
+  const body = document.getElementById("body-" + noteId);
+  const viewBtn = document.getElementById("view-btn-" + noteId);
+  if (body) { body.classList.remove("open"); }
+  if (viewBtn) viewBtn.textContent = "▼ View";
+  const delConfirm = document.getElementById("del-confirm-" + noteId);
+  if (delConfirm) delConfirm.classList.add("open");
+}
+
+function cancelDeleteNote(noteId) {
+  const delConfirm = document.getElementById("del-confirm-" + noteId);
+  if (delConfirm) delConfirm.classList.remove("open");
+}
+
+function commitDeleteNote(patientId, histKey, noteId) {
+  const p = state.patients.find(x => x.id === patientId);
+  if (!p) return;
+  updatePatient(patientId, { [histKey]: (p[histKey]||[]).filter(n => n.id !== noteId) });
+  renderMain();
+  showToast("Note deleted.", "#64748b");
+}
+
+// ── Helper: close all other open edit/delete areas except the active noteId ──
+function _closeAllNoteExtras(exceptNoteId) {
+  document.querySelectorAll(".note-entry-edit-area.open").forEach(el => {
+    if (!exceptNoteId || el.id !== "edit-area-" + exceptNoteId) el.classList.remove("open");
+  });
+  document.querySelectorAll(".note-delete-confirm.open").forEach(el => {
+    if (!exceptNoteId || el.id !== "del-confirm-" + exceptNoteId) el.classList.remove("open");
+  });
+  document.querySelectorAll(".reply-input-area.open").forEach(el => {
+    if (!exceptNoteId || el.id !== "reply-area-" + exceptNoteId) el.classList.remove("open");
+  });
+}
+
+// ── Reply functions ──
+function openReplyBox(noteId) {
+  _closeAllNoteExtras(noteId);
+  // Auto-open the note body so context is visible
+  const body = document.getElementById("body-" + noteId);
+  const viewBtn = document.getElementById("view-btn-" + noteId);
+  if (body && !body.classList.contains("open")) {
+    body.classList.add("open");
+    if (viewBtn) viewBtn.textContent = "▲ Hide";
+  }
+  const area = document.getElementById("reply-area-" + noteId);
+  if (area) {
+    area.classList.add("open");
+    const ta = document.getElementById("reply-ta-" + noteId);
+    if (ta) { ta.focus(); }
+  }
+}
+
+function cancelReply(noteId) {
+  const area = document.getElementById("reply-area-" + noteId);
+  if (area) area.classList.remove("open");
+  const ta = document.getElementById("reply-ta-" + noteId);
+  if (ta) ta.value = "";
+}
+
+function submitReply(patientId, histKey, noteId) {
+  const ta = document.getElementById("reply-ta-" + noteId);
+  if (!ta) return;
+  const text = ta.value.trim();
+  if (!text) { showToast("Reply cannot be empty.", "#dc2626"); return; }
+  const p = state.patients.find(x => x.id === patientId);
+  if (!p) return;
+  const reply = { id: Date.now(), text, ts: new Date().toISOString() };
+  const updatedHistory = (p[histKey]||[]).map(n =>
+    n.id === noteId ? { ...n, replies: [...(n.replies||[]), reply] } : n
+  );
+  updatePatient(patientId, { [histKey]: updatedHistory });
+  renderMain();
+  showToast("Reply posted ✓", "#16a34a");
+}
+
+function deleteReply(patientId, histKey, noteId, replyId) {
+  const p = state.patients.find(x => x.id === patientId);
+  if (!p) return;
+  const updatedHistory = (p[histKey]||[]).map(n =>
+    n.id === noteId ? { ...n, replies: (n.replies||[]).filter(r => r.id !== replyId) } : n
+  );
+  updatePatient(patientId, { [histKey]: updatedHistory });
+  renderMain();
+  showToast("Reply removed.", "#64748b");
+}
+
+// ════════════════════════════════════════════════
+//  ACTIONS
+// ════════════════════════════════════════════════
+function selectPatient(id) { state.selected = id; render(); }
+function onSearch(val) { state.search = val; renderSidebar(); }
+
+function toggleCheck(patientId, key) {
+  const p = state.patients.find(x => x.id === patientId);
+  if (!p) return;
+  updatePatient(patientId, { checklist: { ...p.checklist, [key]: !p.checklist[key] } });
+  renderMain(); renderSidebar();
+}
+
+function onEquipOthers(patientId, value) {
+  updatePatient(patientId, { equipOthers: value });
+}
+
+function onNoteInput(patientId, field, el) {
+  updatePatient(patientId, { [field]: el.value });
+  const type = field.replace("Notes","");
+  const btn = document.getElementById(`savebtn-${type}-${patientId}`);
+  if (btn) { const hasText = el.value.trim().length > 0; btn.className = "note-save-btn" + (hasText?" active":""); }
+}
+
+function saveNote(patientId, draftField, histField) {
+  const p = state.patients.find(x => x.id === patientId);
+  if (!p || !p[draftField]?.trim()) return;
+  const note = { id: Date.now(), text: p[draftField].trim(), ts: new Date().toISOString() };
+  const noteFields = ["physicianHistory","roundHistory","ptHistory","otHistory","slpHistory"];
+  const isTrackedField = noteFields.includes(histField);
+  const changes = {
+    [histField]: [...(p[histField]||[]), note],
+    [draftField]: "",
+  };
+  // Auto-clear high priority flag when a note is saved in any of the 5 note sections
+  if (isTrackedField && p.highPriority) {
+    changes.highPriority = false;
+    showToast(`Priority flag removed — note saved for ${p.name}.`, "#9b2335");
+  }
+  if (isTrackedField && p.isUrgent) {
+    changes.isUrgent = false;
+    showToast(`Urgent flag removed — note saved for ${p.name}.`, "#dc2626");
+  }
+  updatePatient(patientId, changes);
+  renderMain(); renderSidebar();
+}
+
+// ════════════════════════════════════════════════
+//  MODALS
+// ════════════════════════════════════════════════
+function showModal(html, wide=false, archiveBox=false) {
+  const ov = document.getElementById("modal-overlay");
+  const mc = document.getElementById("modal-content");
+  mc.className = "modal-box" + (wide?" wide":"") + (archiveBox?" archive-box":"");
+  mc.innerHTML = html;
+  ov.style.display = "flex";
+}
+function closeModal() { document.getElementById("modal-overlay").style.display = "none"; }
+function handleOverlayClick(e) { if (e.target === document.getElementById("modal-overlay")) closeModal(); }
+
+// ── Add / Edit ──
+function openAddModal() {
+  showModal(patientFormHTML(null));
+}
+function openEditModal(id) {
+  const p = state.patients.find(x => x.id === id);
+  showModal(patientFormHTML(p));
+}
+
+function patientFormHTML(p) {
+  const isEdit = !!p;
+  const v = p || { room:"",name:"",mrn:"",primaryPt:"",primaryOt:"",primarySlp:"",classification:"ABM",highPriority:false,ward:"Ward A" };
+  const opts = CLASSIFICATIONS.map(c => `<option value="${c}"${c===v.classification?" selected":""}>${c}</option>`).join("");
+  const wardOpts = WARDS.map(w => `<option value="${w.id}"${w.id===(v.ward||"Ward A")?" selected":""}>${w.label}</option>`).join("");
+  return `
+    <div class="modal-head">
+      <span class="modal-title">${isEdit?"✏️ Edit Patient":"➕ Add New Patient"}</span>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid-2">
+        <div><label class="field-label">Room #</label><input class="field-input" id="f-room" value="${esc(v.room)}" placeholder="e.g. 101A" /></div>
+        <div><label class="field-label">MRN</label><input class="field-input" id="f-mrn" value="${esc(v.mrn)}" placeholder="e.g. MRN-001234" /></div>
+      </div>
+      <div><label class="field-label">Patient Name</label><input class="field-input" id="f-name" value="${esc(v.name)}" placeholder="Full name" /></div>
+      <div class="form-grid-2">
+        <div><label class="field-label">Primary PT</label><input class="field-input" id="f-primaryPt" value="${esc(v.primaryPt||"")}" placeholder="e.g. Dr. Rivera" /></div>
+        <div><label class="field-label">Primary OT</label><input class="field-input" id="f-primaryOt" value="${esc(v.primaryOt||"")}" placeholder="e.g. Dr. Kim" /></div>
+      </div>
+      <div><label class="field-label">Primary SLP</label><input class="field-input" id="f-primarySlp" value="${esc(v.primarySlp||"")}" placeholder="e.g. Dr. Patel" /></div>
+      <div class="form-grid-2">
+        <div><label class="field-label">Ward</label><select class="field-input" id="f-ward">${wardOpts}</select></div>
+        <div><label class="field-label">Classification</label><select class="field-input" id="f-cls">${opts}</select></div>
+      </div>
+      <div class="form-grid-2">
+        <div><label class="field-label">Priority</label>
+          <button class="priority-toggle${v.highPriority?" on":""}" id="f-priority-btn" onclick="togglePriority()">
+            🚩 <span id="f-priority-label">${v.highPriority?"Priority":"Normal"}</span>
+          </button>
+          <input type="hidden" id="f-priority" value="${v.highPriority?1:0}"/>
+        </div>
+        <div><label class="field-label">Urgent</label>
+          <button class="priority-toggle-urgent${v.isUrgent?" on":""}" id="f-urgent-btn" onclick="toggleUrgent()">
+            🔴 <span id="f-urgent-label">${v.isUrgent?"Urgent":"Normal"}</span>
+          </button>
+          <input type="hidden" id="f-urgent" value="${v.isUrgent?1:0}"/>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+        <button class="btn-primary" onclick="submitPatientForm(${isEdit?v.id:"null"})">${isEdit?"Save Changes":"Add Patient"}</button>
+      </div>
+    </div>`;
+}
+
+function togglePriority() {
+  const inp = document.getElementById("f-priority");
+  const btn = document.getElementById("f-priority-btn");
+  const lbl = document.getElementById("f-priority-label");
+  const isOn = inp.value === "1";
+  inp.value = isOn ? "0" : "1";
+  btn.className = "priority-toggle" + (isOn ? "" : " on");
+  lbl.textContent = isOn ? "Normal" : "Priority";
+}
+
+function toggleUrgent() {
+  const inp = document.getElementById("f-urgent");
+  const btn = document.getElementById("f-urgent-btn");
+  const lbl = document.getElementById("f-urgent-label");
+  const isOn = inp.value === "1";
+  inp.value = isOn ? "0" : "1";
+  btn.className = "priority-toggle-urgent" + (isOn ? "" : " on");
+  lbl.textContent = isOn ? "Normal" : "Urgent";
+}
+
+function submitPatientForm(editId) {
+  const room = document.getElementById("f-room").value.trim();
+  const mrn  = document.getElementById("f-mrn").value.trim();
+  const name = document.getElementById("f-name").value.trim();
+  const primaryPt  = document.getElementById("f-primaryPt").value.trim();
+  const primaryOt  = document.getElementById("f-primaryOt").value.trim();
+  const primarySlp = document.getElementById("f-primarySlp").value.trim();
+  const cls  = document.getElementById("f-cls").value;
+  const ward = document.getElementById("f-ward").value;
+  const hp   = document.getElementById("f-priority").value === "1";
+  const isUrgent = document.getElementById("f-urgent").value === "1";
+  if (!room || !mrn || !name) { showToast("Please fill in Room, MRN and Patient Name.", "#dc2626"); return; }
+  if (editId !== null) {
+    updatePatient(editId, { room, mrn, name, primaryPt, primaryOt, primarySlp, classification: cls, highPriority: hp, isUrgent, ward });
+  } else {
+    const newP = mkPatient(Date.now(), room, name, mrn, primaryPt, cls, hp, {stable:false,unstable:false,bariatricWheelchair:false,comfortWheelchair:false,highframeWalker:false,hoist:false,medicalBed:false,sling:false,standardWalker:false,standardWheelchair:false,wheeledWalker:false}, ward, primaryOt, primarySlp);
+    state.patients.push(newP);
+    state.selected = newP.id;
+    save();
+  }
+  closeModal(); render();
+}
+
+// ── Archive confirm ──
+function openArchiveConfirm(id) {
+  const p = state.patients.find(x => x.id === id);
+  showModal(`
+    <div class="confirm-box">
+      <div class="confirm-icon">🗄️</div>
+      <div class="confirm-title">Archive Patient?</div>
+      <div class="confirm-msg"><strong>${esc(p.name)}</strong> (Room ${esc(p.room)}) will be moved to the archive.</div>
+      <div class="confirm-sub">You can restore them later by name or MRN from the Archive.</div>
+      <div class="modal-actions" style="width:100%">
+        <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+        <button class="btn-danger" onclick="archivePatient(${id})">Archive</button>
+      </div>
+    </div>`);
+}
+
+function archivePatient(id) {
+  const p = state.patients.find(x => x.id === id);
+  if (!p) return;
+  state.archive.push({ ...p, archivedAt: new Date().toISOString() });
+  state.patients = state.patients.filter(x => x.id !== id);
+  state.selected = state.patients[0]?.id ?? null;
+  save(); closeModal(); render();
+  showToast(`${p.name} archived. Restore anytime from Archive.`, "#7c3aed");
+}
+
+// ── Permanent Delete ──
+function openDeleteConfirm(id) {
+  const p = state.patients.find(x => x.id === id);
+  if (!p) return;
+  showModal(`
+    <div class="confirm-box">
+      <div class="confirm-icon">🗑️</div>
+      <div class="confirm-title">Delete Patient?</div>
+      <div class="confirm-msg"><strong>${esc(p.name)}</strong> (Room ${esc(p.room)}) will be <strong>permanently deleted</strong>.</div>
+      <div class="confirm-sub">This cannot be undone. All notes and history will be lost.<br/>Use <em>Archive</em> instead if you may need this record later.</div>
+      <div class="modal-actions" style="width:100%">
+        <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+        <button class="btn-danger" onclick="permanentlyDeletePatient(${id})">Delete Permanently</button>
+      </div>
+    </div>`);
+}
+
+function permanentlyDeletePatient(id) {
+  const p = state.patients.find(x => x.id === id);
+  if (!p) return;
+  const name = p.name;
+  state.patients = state.patients.filter(x => x.id !== id);
+  if (state.selected === id) state.selected = state.patients[0]?.id ?? null;
+  save(); closeModal(); render();
+  showToast(`${name} permanently deleted.`, "#dc2626");
+}
+
+// ── Archive modal ──
+function openArchiveModal() {
+  renderArchiveModal("");
+}
+
+function renderArchiveModal(query) {
+  const results = state.archive.filter(p =>
+    p.name.toLowerCase().includes(query.toLowerCase()) ||
+    p.mrn.toLowerCase().includes(query.toLowerCase())
+  );
+  const rows = results.length === 0
+    ? `<div class="archive-empty">${state.archive.length===0?"No archived patients yet.":"No matches found."}</div>`
+    : results.map(p => `
+        <div class="archive-row">
+          <div>
+            <div class="archive-name">${esc(p.name)}</div>
+            <div class="archive-meta">${esc(p.mrn)} · Room ${esc(p.room)} · PT: ${esc(p.primaryPt||"—")}</div>
+            <div class="archive-ts">Archived ${formatTS(p.archivedAt)}</div>
+          </div>
+          <button class="btn-restore" onclick="restorePatient(${p.id})">Restore</button>
+        </div>`).join("");
+
+  showModal(`
+    <div class="modal-head">
+      <span class="modal-title">🗄️ Patient Archive</span>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="archive-search-bar">
+      <input class="field-input" autofocus placeholder="Search by name or MRN…" value="${esc(query)}" oninput="renderArchiveModal(this.value)" style="font-size:14px"/>
+    </div>
+    <div class="archive-list modal-body scroll" style="padding:0">${rows}</div>
+  `, false, true);
+}
+
+function restorePatient(id) {
+  const p = state.archive.find(x => x.id === id);
+  if (!p) return;
+  const { archivedAt, ...patient } = p;
+  state.patients.push(patient);
+  state.archive = state.archive.filter(x => x.id !== id);
+  state.selected = patient.id;
+  save(); closeModal(); render();
+  showToast(`${patient.name} restored successfully ✓`, "#16a34a");
+}
+
+// ── Sheet modal ──
+function openSheetModal() {
+  showModal(`
+    <div class="modal-head">
+      <span class="modal-title">🔗 Google Sheet Sync</span>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="info-box">
+        <strong>How to connect your Google Sheet:</strong><br/>
+        1. Open your Google Sheet with patient data<br/>
+        2. Go to <strong>File → Share → Publish to web</strong><br/>
+        3. Select <strong>Sheet1</strong> and format <strong>CSV</strong>, click Publish<br/>
+        4. Copy the URL and paste it below<br/><br/>
+        <strong>Required columns (row 1 headers):</strong><br/>
+        room, name, mrn, primaryPt, primaryOt, primarySlp, classification, highPriority, isUrgent, ward
+      </div>
+      <div>
+        <label class="field-label">CSV Publish URL</label>
+        <input class="field-input" id="sheet-url-input" value="${esc(state.sheetUrl)}" placeholder="https://docs.google.com/spreadsheets/d/.../pub?output=csv" />
+      </div>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+        <button class="btn-primary" onclick="saveSheet()">Save &amp; Sync</button>
+      </div>
+    </div>`, true);
+}
+
+function saveSheet() {
+  state.sheetUrl = document.getElementById("sheet-url-input").value.trim();
+  save(); closeModal(); syncNow();
+}
+
+async function syncNow() {
+  if (!state.sheetUrl) { showToast("No Google Sheet URL configured.", "#dc2626"); return; }
+  state.syncStatus = "syncing"; renderHeader();
+  try {
+    const res = await fetch(state.sheetUrl);
+    if (!res.ok) throw new Error();
+    const text = await res.text();
+    const rows = parseCSV(text);
+    if (!rows.length) throw new Error("empty");
+    // Merge: preserve notes & history
+    const byMrn = {};
+    state.patients.forEach(p => { byMrn[p.mrn] = p; });
+    state.patients = rows.map(r => {
+      const ex = byMrn[r.mrn] || {};
+      const defaultCl = {stable:false,unstable:false,bariatricWheelchair:false,comfortWheelchair:false,highframeWalker:false,hoist:false,medicalBed:false,sling:false,standardWalker:false,standardWheelchair:false,wheeledWalker:false};
+      return { ...mkPatient(r.id||Date.now(),r.room,r.name,r.mrn,r.primaryPt||"",r.classification,r.highPriority,defaultCl,r.ward||ex.ward||"Ward A",r.primaryOt||"",r.primarySlp||""), ...ex, ...r,
+        primaryPt: r.primaryPt||ex.primaryPt||"", primaryOt: r.primaryOt||ex.primaryOt||"", primarySlp: r.primarySlp||ex.primarySlp||"",
+        equipOthers: ex.equipOthers||"",
+        ward: r.ward || ex.ward || "Ward A",
+        checklist: ex.checklist || defaultCl,
+        physicianNotes: ex.physicianNotes||"", roundNotes: ex.roundNotes||"", ptNotes: ex.ptNotes||"", otNotes: ex.otNotes||"", slpNotes: ex.slpNotes||"",
+        physicianHistory: ex.physicianHistory||[], roundHistory: ex.roundHistory||[], ptHistory: ex.ptHistory||[], otHistory: ex.otHistory||[], slpHistory: ex.slpHistory||[] };
+    });
+    if (!state.patients.find(p=>p.id===state.selected)) state.selected = state.patients[0]?.id ?? null;
+    state.syncStatus = "ok"; save(); render();
+    showToast(`Synced ${rows.length} patients from Google Sheet ✓`, "#16a34a");
+  } catch {
+    state.syncStatus = "error"; renderHeader();
+    showToast("Sync failed. Check the URL and ensure the sheet is published publicly.", "#dc2626");
+  }
+}
+
+function parseCSV(text) {
+  const lines = text.trim().split("\n").filter(Boolean);
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(",").map(h => h.trim().toLowerCase().replace(/[^a-z]/g,""));
+  return lines.slice(1).map((line, i) => {
+    const cols = line.split(",").map(c => c.trim().replace(/^"|"$/g,""));
+    const row = {};
+    headers.forEach((h,idx) => { row[h] = cols[idx]??""; });
+    const cls = row.classification?.toUpperCase();
+    const validWards = WARDS.map(w => w.id);
+    const rawWard = row.ward ? row.ward.trim() : "";
+    const ward = validWards.find(w => w.toLowerCase() === rawWard.toLowerCase()) || "Ward A";
+    return {
+      id: row.mrn || `csv-${i}`,
+      room: row.room||"", name: row.name||"", mrn: row.mrn||"",
+      primaryPt: row.primarypt||row.therapist||"",
+      primaryOt: row.primaryot||"",
+      primarySlp: row.primaryslp||"",
+      classification: CLASSIFICATIONS.includes(cls) ? cls : "ABM",
+      highPriority: row.highpriority?.toLowerCase()==="true" || row.highpriority==="1",
+      isUrgent: row.isurgent?.toLowerCase()==="true" || row.isurgent==="1",
+      ward,
+    };
+  }).filter(r => r.name);
+}
+
+// ════════════════════════════════════════════════
+//  UTILS
+// ════════════════════════════════════════════════
+function esc(str) {
+  return String(str||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
+
+function formatTS(iso) {
+  return new Date(iso).toLocaleString("en-US",{month:"short",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit",hour12:true});
+}
+
+let toastTimer;
+function showToast(msg, color="#9b2335") {
+  const el = document.getElementById("toast");
+  el.textContent = msg; el.style.background = color; el.style.display = "block";
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.style.display = "none"; }, 3500);
+}
+
+// ════════════════════════════════════════════════
+//  BOOT
+// ════════════════════════════════════════════════
+render();
+</script>
+</body>
+</html>
