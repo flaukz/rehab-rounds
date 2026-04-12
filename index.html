@@ -1,1 +1,918 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Salma Rahba Rehabilitation Medicine – Hospital Rounding System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --deep:#7b1f2e;--mid:#9b2335;--lite:#b83245;
+  --bg:#fdf4f5;--pale:#fdf0f1;--border:#f0cdd1;--soft:#fad5d9;--sidebar:#fdf7f7;
+  --td:#2d1417;--tm:#3d1e22;--mu:#9b6670;--fa:#b08088;
+  --font:'DM Sans',sans-serif;--disp:'DM Serif Display',serif;
+  --sh:0 2px 10px rgba(120,30,40,0.07);
+}
+html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--td);}
+button{font-family:var(--font);cursor:pointer;}
+input,select,textarea{font-family:var(--font);}
+::-webkit-scrollbar{width:6px;height:6px;}
+::-webkit-scrollbar-thumb{background:#e8c0c5;border-radius:10px;}
 
+/* LOGIN */
+#login-screen{position:fixed;inset:0;background:linear-gradient(135deg,#7b1f2e 0%,#9b2335 50%,#b83245 100%);display:flex;align-items:center;justify-content:center;z-index:9999;}
+.login-box{background:#fff;border-radius:20px;padding:40px 36px;width:min(400px,94vw);box-shadow:0 24px 64px rgba(0,0,0,0.2);}
+.login-logo{text-align:center;margin-bottom:28px;}
+.login-logo .icon{font-size:42px;margin-bottom:12px;}
+.login-logo h1{font-family:var(--disp);font-size:21px;color:var(--deep);line-height:1.3;}
+.login-logo p{font-size:11px;color:var(--mu);text-transform:uppercase;letter-spacing:0.08em;margin-top:5px;}
+.lf{margin-bottom:15px;}
+.lf label{display:block;font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:5px;}
+.lf input{width:100%;padding:11px 13px;border-radius:9px;border:1.5px solid #edcacf;font-size:14px;color:var(--td);outline:none;background:#fdf8f8;}
+.lf input:focus{border-color:var(--mid);box-shadow:0 0 0 3px rgba(155,35,53,0.12);}
+.login-btn{width:100%;padding:13px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--deep),var(--mid));color:#fff;font-size:14px;font-weight:700;margin-top:6px;letter-spacing:0.03em;}
+.login-btn:hover{opacity:0.9;}
+.login-btn:disabled{opacity:0.6;cursor:not-allowed;}
+.login-err{font-size:12px;color:#dc2626;text-align:center;margin-top:10px;min-height:18px;}
+
+/* APP */
+#app{display:none;flex-direction:column;height:100vh;overflow:hidden;}
+#header{background:linear-gradient(135deg,var(--deep) 0%,var(--mid) 60%,var(--lite) 100%);height:58px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 20px;gap:12px;box-shadow:0 2px 12px rgba(123,31,46,0.22);}
+.hdr-brand{display:flex;align-items:center;gap:12px;}
+.hdr-icon{width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,0.18);display:flex;align-items:center;justify-content:center;font-size:18px;}
+.hdr-title{font-family:var(--disp);font-size:14px;color:#fff;}
+.hdr-sub{font-size:10px;color:rgba(255,255,255,0.65);letter-spacing:0.08em;text-transform:uppercase;}
+.hdr-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.hdr-btn{display:flex;align-items:center;gap:6px;padding:6px 13px;border-radius:8px;border:1.5px solid rgba(255,255,255,0.35);background:rgba(255,255,255,0.12);color:#fff;font-size:12px;font-weight:600;transition:opacity 0.15s;}
+.hdr-btn:hover{opacity:0.8;}
+.hdr-date{font-size:12px;color:rgba(255,255,255,0.75);}
+.hdr-user{font-size:12px;color:rgba(255,255,255,0.85);font-weight:600;}
+.hdr-avatar{width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,0.22);display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;font-weight:700;cursor:pointer;}
+.hdr-avatar:hover{background:rgba(255,255,255,0.32);}
+#body{display:flex;flex:1;overflow:hidden;}
+
+/* SIDEBAR */
+#sidebar{width:300px;flex-shrink:0;background:var(--sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+.sidebar-top{padding:14px 14px 10px;}
+.sidebar-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.sidebar-lbl{font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:0.09em;}
+.btn-add{display:flex;align-items:center;gap:5px;background:linear-gradient(135deg,var(--deep),var(--mid));color:#fff;border:none;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:700;}
+.search-input{width:100%;padding:8px 12px;border-radius:8px;border:1px solid #edcacf;background:#fff;font-size:12px;color:var(--tm);outline:none;}
+.search-input:focus{border-color:var(--mid);}
+#patient-list{overflow-y:auto;flex:1;padding-bottom:10px;}
+.empty-list{padding:24px 14px;text-align:center;color:var(--fa);font-size:13px;}
+.sidebar-foot{padding:10px 14px;border-top:1px solid var(--border);font-size:11px;color:var(--mu);background:var(--sidebar);}
+
+/* WARD SECTIONS */
+.ward-section{border-bottom:1px solid var(--border);}
+.ward-hdr{display:flex;align-items:center;gap:8px;padding:9px 14px;cursor:pointer;background:var(--sidebar);border:none;width:100%;text-align:left;transition:background 0.12s;}
+.ward-hdr:hover{background:#fae8ea;}
+.ward-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.ward-name{font-size:12px;font-weight:700;color:var(--td);flex:1;}
+.ward-cnt{font-size:10px;font-weight:700;color:var(--mu);background:#f5d5d8;border-radius:20px;padding:1px 7px;}
+.ward-chev{font-size:10px;color:var(--fa);}
+.ward-pats{display:block;}.ward-pats.collapsed{display:none;}
+.pri-section{border-bottom:2px solid #f5b8c0;}
+.pri-hdr{background:linear-gradient(90deg,#fdf0f1,#fdf7f7)!important;}
+.pri-hdr:hover{background:#fae8ea!important;}
+.urg-section{border-bottom:2px solid #fca5a5;}
+.urg-hdr{background:linear-gradient(90deg,#fff1f1,#fdf7f7)!important;}
+.urg-hdr:hover{background:#fee2e2!important;}
+.urg-badge{font-size:11px;font-weight:700;background:#dc2626;color:#fff;border-radius:6px;padding:2px 8px;}
+.pri-badge{font-size:11px;font-weight:700;background:#fee2e2;color:#dc2626;border-radius:6px;padding:2px 8px;}
+.ptoggle{width:100%;padding:8px 11px;border-radius:8px;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;border:1.5px solid #edcacf;background:#fdf8f8;color:#b08088;cursor:pointer;transition:all 0.15s;}
+.ptoggle.on{border-color:#dc2626;background:#fee2e2;color:#dc2626;}
+.utoggle{width:100%;padding:8px 11px;border-radius:8px;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;border:1.5px solid #edcacf;background:#fdf8f8;color:#b08088;cursor:pointer;transition:all 0.15s;}
+.utoggle.on{border-color:#dc2626;background:#dc2626;color:#fff;}
+
+/* PATIENT ROWS */
+.pat-row{padding:11px 14px;border-left:3px solid transparent;cursor:pointer;border-bottom:1px solid #f0e4e6;background:var(--sidebar);transition:background 0.12s;position:relative;}
+.pat-row:hover{background:#fae8ea;}
+.pat-row.active{background:var(--soft)!important;border-left-color:var(--mid)!important;}
+.row-top{display:flex;justify-content:space-between;align-items:flex-start;}
+.row-room{font-size:11px;font-weight:700;color:var(--mid);background:var(--soft);border-radius:5px;padding:1px 6px;}
+.row-name{font-weight:600;font-size:13px;color:var(--td);margin-top:5px;}
+.row-mrn{font-size:11px;color:#b08088;margin-top:2px;}
+.row-bot{display:flex;justify-content:space-between;align-items:center;margin-top:6px;}
+.row-pt{font-size:11px;color:var(--mu);}
+.row-done{font-size:10px;color:var(--fa);}.row-done.complete{color:#16a34a;}
+.row-acts{position:absolute;bottom:8px;right:10px;display:none;gap:5px;}
+.pat-row:hover .row-acts{display:flex;}
+.re-btn{padding:3px 9px;border-radius:6px;border:1px solid #edcacf;background:#fdf0f1;color:var(--mid);font-size:11px;font-weight:600;}
+.re-btn:hover{background:#f7d5d8;}
+.ra-btn{padding:3px 9px;border-radius:6px;border:1px solid #fecaca;background:#fff5f5;color:#dc2626;font-size:11px;font-weight:600;}
+.ra-btn:hover{background:#fee2e2;}
+.rd-btn{padding:3px 8px;border-radius:6px;border:1px solid #fca5a5;background:#dc2626;color:#fff;font-size:11px;font-weight:700;}
+.rd-btn:hover{background:#b91c1c;}
+
+/* BADGES */
+.cls-badge{font-size:10px;font-weight:600;border-radius:5px;padding:2px 7px;}
+.cls-ABM{background:#fad5d9;color:#7b1f2e;}.cls-LC{background:#dcfce7;color:#166534;}
+.cls-LTC{background:#fef9c3;color:#854d0e;}.cls-SSR{background:#fce7f3;color:#9d174d;}
+.cls-PAR{background:#ede9fe;color:#5b21b6;}
+.ward-dot-warda{background:#7b1f2e;}.ward-dot-wardb{background:#10b981;}
+.ward-dot-icu1{background:#f59e0b;}.ward-dot-icu2{background:#ef4444;}
+.wbadge{font-size:10px;font-weight:700;border-radius:5px;padding:2px 7px;}
+.wbadge-warda{background:#fad5d9;color:#7b1f2e;}.wbadge-wardb{background:#d1fae5;color:#065f46;}
+.wbadge-icu1{background:#fef3c7;color:#92400e;}.wbadge-icu2{background:#fee2e2;color:#991b1b;}
+
+/* MAIN */
+#main{flex:1;overflow-y:auto;padding:20px 24px;}
+.empty-main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;}
+
+/* PATIENT CARD */
+.pat-card{background:#fff;border-radius:14px;padding:18px 22px;border:1px solid #f5d5d8;box-shadow:var(--sh);margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;}
+.pat-card-l{display:flex;align-items:center;gap:16px;}
+.pat-avatar{width:50px;height:50px;border-radius:50%;background:linear-gradient(135deg,#f5b8c0,#ee9aaa);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:var(--deep);flex-shrink:0;}
+.pat-fullname{font-family:var(--disp);font-size:22px;color:var(--td);}
+.pat-meta{display:flex;gap:14px;margin-top:3px;flex-wrap:wrap;}
+.pat-meta span{font-size:12px;color:var(--mu);}
+.pat-card-r{display:flex;align-items:center;gap:10px;}
+.edit-pat-btn{display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:9px;border:1.5px solid #edcacf;background:#fdf0f1;color:var(--mid);font-size:12px;font-weight:600;}
+.edit-pat-btn:hover{background:#f7d5d8;}
+
+/* CHECKLIST */
+.chk-card{background:#fff;border-radius:14px;border:1px solid #f5d5d8;box-shadow:var(--sh);margin-bottom:18px;overflow:hidden;}
+.card-hdr{padding:12px 20px;background:linear-gradient(90deg,#fdf0f1,#fdf8f8);border-bottom:1px solid #f5d5d8;display:flex;align-items:center;gap:8px;}
+.card-hdr-lbl{font-weight:700;font-size:13px;color:#7b1f2e;letter-spacing:0.03em;}
+.chk-items{display:flex;gap:14px;padding:16px 20px;flex-wrap:wrap;}
+.chk-divider{display:flex;align-items:center;gap:10px;padding:8px 20px;background:linear-gradient(90deg,#fdf0f1,#fdf8f8);border-top:1px solid #f0cdd1;border-bottom:1px solid #f0cdd1;font-size:12px;font-weight:700;color:#7b1f2e;letter-spacing:0.04em;}
+.chk-btn{flex:1;min-width:140px;padding:14px 16px;border-radius:12px;border:2px solid #f5d5d8;background:#fdf8f8;text-align:left;display:flex;align-items:center;gap:12px;transition:all 0.15s;}
+.chk-btn:hover{transform:scale(1.02);}
+.chk-box{width:28px;height:28px;border-radius:8px;background:#f5d5d8;display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;transition:background 0.15s;flex-shrink:0;}
+.chk-lbl{font-weight:600;font-size:13px;color:#64748b;}
+.chk-sub{font-size:10px;color:var(--fa);margin-top:1px;}
+.eq-btn{display:flex;align-items:center;gap:8px;padding:9px 14px;border-radius:10px;border:1.5px solid #edcacf;background:#fdf8f8;cursor:pointer;font-family:var(--font);transition:all 0.15s;}
+.eq-btn:hover{background:#faeaec;border-color:#d4929c;}
+.eq-btn.checked{border-color:#9b2335;background:linear-gradient(135deg,#fad5d9,#fff8f8);}
+.eq-icon{font-size:16px;}.eq-lbl{font-size:12px;font-weight:600;color:#3d1e22;}
+.eq-btn.checked .eq-lbl{color:#7b1f2e;}
+.eq-chk{font-size:11px;font-weight:700;color:#9b2335;background:#fad5d9;border-radius:20px;padding:1px 7px;margin-left:2px;}
+.eq-other{width:100%;padding:8px 12px;border-radius:8px;border:1.5px solid #edcacf;outline:none;font-size:13px;color:#3d1e22;background:#fdf8f8;font-family:var(--font);}
+.eq-other:focus{border-color:#9b2335;}
+
+/* NOTES */
+.notes-wrap{display:flex;flex-direction:column;gap:14px;}
+.note-card{background:#fff;border-radius:12px;border:1px solid #f5d5d8;overflow:hidden;box-shadow:0 1px 4px rgba(123,31,46,0.06);}
+.note-hdr{display:flex;align-items:center;gap:8px;padding:10px 16px;background:linear-gradient(90deg,#fdf0f1,#fdf8f8);border-bottom:1px solid #f5d5d8;}
+.note-hdr-lbl{font-weight:600;font-size:13px;color:#7b1f2e;letter-spacing:0.03em;}
+.note-cnt{margin-left:auto;font-size:11px;color:var(--mu);background:#fae8ea;border-radius:20px;padding:2px 9px;}
+.note-input-area{padding:12px 16px 0;}
+.note-ta{width:100%;min-height:80px;padding:10px 12px;border-radius:8px;border:1.5px solid #edcacf;outline:none;resize:vertical;font-size:13px;color:var(--tm);background:#fdf8f8;line-height:1.7;transition:border-color 0.15s;}
+.note-ta:focus{border-color:var(--mid);box-shadow:0 0 0 3px rgba(155,35,53,0.12);}
+.note-save-row{display:flex;justify-content:flex-end;padding:8px 16px 12px;}
+.note-save-btn{padding:6px 18px;border-radius:8px;border:none;background:#edcacf;color:#fff;font-size:12px;font-weight:700;letter-spacing:0.03em;transition:background 0.15s;}
+.note-save-btn.active{background:linear-gradient(135deg,var(--deep),var(--mid));cursor:pointer;}
+.note-hist{border-top:1px solid #fae8ea;}
+.note-hist-lbl{padding:8px 16px 4px;font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:0.07em;}
+.note-entry{border-top:1px solid #fdf0f1;}
+.note-entry-hdr{display:flex;align-items:center;gap:8px;padding:9px 16px;}
+.note-entry-hdr:hover{background:#fdf8f8;}
+.note-ts{font-size:11px;color:var(--lite);font-weight:600;flex:1;cursor:pointer;line-height:1.5;}
+.note-ts .etag{color:var(--fa);font-weight:400;font-size:10px;display:block;margin-top:1px;}
+.note-author{font-size:10px;color:var(--mu);background:#fdf0f1;border-radius:10px;padding:1px 7px;white-space:nowrap;}
+.note-acts{display:flex;align-items:center;gap:5px;flex-shrink:0;}
+.ne-btn{padding:3px 9px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid transparent;}
+.ne-view{border-color:#edcacf;background:#fdf0f1;color:var(--mid);}.ne-view:hover{background:#f7d5d8;}
+.ne-edit{border-color:#edcacf;background:#fdf0f1;color:var(--mid);}.ne-edit:hover{background:#f7d5d8;}
+.ne-del{border-color:#fecaca;background:#fff5f5;color:#dc2626;}.ne-del:hover{background:#fee2e2;}
+.ne-rep{border-color:#edcacf;background:#fdf0f1;color:#7b1f2e;}.ne-rep:hover{background:#f7d5d8;}
+.note-body{padding:10px 16px 14px;font-size:13px;color:var(--tm);line-height:1.7;white-space:pre-wrap;background:#fdf8f8;border-top:1px dashed #f5d5d8;display:none;}
+.note-body.open{display:block;}
+.note-edit-area{padding:10px 16px 14px;background:#fdf0f1;border-top:1px solid #f5b8c0;display:none;}
+.note-edit-area.open{display:block;}
+.note-edit-ta{width:100%;min-height:90px;padding:10px 12px;border-radius:8px;border:1.5px solid #ee9aaa;outline:none;resize:vertical;font-size:13px;color:var(--tm);background:#fff;line-height:1.7;font-family:var(--font);}
+.note-edit-ta:focus{border-color:var(--mid);}
+.note-edit-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:8px;}
+.ne-cancel{padding:5px 14px;border-radius:7px;border:1.5px solid #edcacf;background:#fff;color:var(--mu);font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font);}
+.ne-cancel:hover{background:#fdf0f1;}
+.ne-save{padding:5px 16px;border-radius:7px;border:none;background:linear-gradient(135deg,var(--deep),var(--mid));color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);}
+.ne-save:hover{opacity:0.9;}
+.del-confirm{padding:10px 16px 14px;background:#fff5f5;border-top:1px solid #fecaca;display:none;align-items:center;justify-content:space-between;gap:12px;}
+.del-confirm.open{display:flex;}
+.del-msg{font-size:12px;color:#dc2626;font-weight:600;}
+.del-acts{display:flex;gap:7px;flex-shrink:0;}
+.dc-cancel{padding:4px 12px;border-radius:6px;border:1px solid #edcacf;background:#fff;color:var(--mu);font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font);}
+.dc-cancel:hover{background:#fdf0f1;}
+.dc-confirm{padding:4px 12px;border-radius:6px;border:none;background:#dc2626;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);}
+.dc-confirm:hover{background:#b91c1c;}
+.reply-thread{background:#fdf7f7;border-top:1px solid #f0cdd1;padding:0 16px 8px 32px;}
+.reply-entry{padding:8px 0 6px;border-bottom:1px dashed #f0cdd1;}
+.reply-entry:last-child{border-bottom:none;}
+.reply-meta{display:flex;align-items:center;gap:8px;margin-bottom:4px;}
+.reply-ts{font-size:10px;color:#b83245;font-weight:600;flex:1;}
+.reply-author{font-size:10px;color:var(--mu);background:#fdf0f1;border-radius:10px;padding:1px 6px;}
+.reply-del{font-size:10px;padding:1px 7px;border-radius:5px;border:1px solid #fecaca;background:#fff5f5;color:#dc2626;cursor:pointer;font-weight:600;font-family:var(--font);}
+.reply-del:hover{background:#fee2e2;}
+.reply-text{font-size:12px;color:#3d1e22;line-height:1.65;white-space:pre-wrap;}
+.reply-input{display:none;background:#fdf0f1;border-top:1px solid #f5d5d8;padding:10px 16px 12px 32px;}
+.reply-input.open{display:block;}
+.reply-ta{width:100%;min-height:60px;padding:8px 10px;border-radius:8px;border:1.5px solid #edcacf;outline:none;resize:vertical;font-size:12px;color:#3d1e22;background:#fff;line-height:1.6;font-family:var(--font);}
+.reply-ta:focus{border-color:#9b2335;}
+.reply-acts{display:flex;justify-content:flex-end;gap:7px;margin-top:7px;}
+.reply-cancel{padding:4px 12px;border-radius:7px;border:1.5px solid #edcacf;background:#fff;color:#9b6670;font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font);}
+.reply-cancel:hover{background:#fdf0f1;}
+.reply-post{padding:4px 14px;border-radius:7px;border:none;background:linear-gradient(135deg,#7b1f2e,#9b2335);color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--font);}
+.reply-post:hover{opacity:0.88;}
+
+/* MODALS */
+.modal-overlay{position:fixed;inset:0;z-index:1000;background:rgba(45,20,23,0.45);display:flex;align-items:center;justify-content:center;}
+.modal-box{background:#fff;border-radius:18px;box-shadow:0 20px 60px rgba(123,31,46,0.22);overflow:hidden;width:min(490px,96vw);}
+.modal-box.wide{width:min(540px,96vw);}
+.modal-box.arc-box{width:min(520px,96vw);max-height:80vh;display:flex;flex-direction:column;}
+.modal-head{background:linear-gradient(135deg,var(--deep),var(--mid));padding:16px 22px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.modal-title{font-family:var(--disp);font-size:19px;color:#fff;}
+.modal-close{background:rgba(255,255,255,0.18);border:none;border-radius:8px;color:#fff;font-size:20px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.modal-close:hover{background:rgba(255,255,255,0.28);}
+.modal-body{padding:22px 24px;display:flex;flex-direction:column;gap:15px;}
+.modal-body.scroll{overflow-y:auto;flex:1;}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.fl{font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:0.07em;display:block;margin-bottom:5px;}
+.fi{width:100%;padding:8px 11px;border-radius:8px;border:1.5px solid #edcacf;font-size:13px;color:var(--td);outline:none;background:#fdf8f8;}
+.fi:focus{border-color:var(--mid);box-shadow:0 0 0 3px rgba(155,35,53,0.12);}
+.modal-acts{display:flex;gap:10px;margin-top:4px;}
+.btn-cancel{flex:1;padding:10px;border-radius:10px;border:1.5px solid #edcacf;background:#fdf8f8;color:var(--mu);font-size:13px;font-weight:600;cursor:pointer;}
+.btn-cancel:hover{background:#fdf0f1;}
+.btn-primary{flex:2;padding:10px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--deep),var(--mid));color:#fff;font-size:13px;font-weight:700;cursor:pointer;}
+.btn-primary:hover{opacity:0.9;}
+.btn-danger{flex:1;padding:10px;border-radius:10px;border:none;background:linear-gradient(135deg,#dc2626,#ef4444);color:#fff;font-size:13px;font-weight:700;cursor:pointer;}
+.btn-danger:hover{opacity:0.9;}
+.arc-search{padding:16px 20px;border-bottom:1px solid #f5d5d8;flex-shrink:0;}
+.arc-list{overflow-y:auto;flex:1;}
+.arc-empty{padding:32px;text-align:center;color:var(--fa);font-size:13px;}
+.arc-row{padding:14px 20px;border-bottom:1px solid #fdf0f1;display:flex;justify-content:space-between;align-items:center;gap:12px;}
+.arc-name{font-weight:600;font-size:14px;color:var(--td);}
+.arc-meta{font-size:12px;color:#b08088;margin-top:2px;}
+.arc-ts{font-size:11px;color:var(--fa);margin-top:2px;}
+.btn-restore{padding:7px 16px;border-radius:9px;border:none;background:linear-gradient(135deg,var(--deep),var(--mid));color:#fff;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0;}
+.btn-restore:hover{opacity:0.9;}
+.info-box{background:#fdf0f1;border-radius:10px;padding:14px 16px;font-size:12px;color:#9b2335;line-height:1.8;}
+.confirm-box{padding:30px 28px 24px;text-align:center;display:flex;flex-direction:column;align-items:center;}
+.conf-icon{font-size:38px;margin-bottom:12px;}
+.conf-title{font-family:var(--disp);font-size:19px;color:var(--td);margin-bottom:8px;}
+.conf-msg{font-size:13px;color:var(--mu);line-height:1.6;margin-bottom:6px;}
+.conf-sub{font-size:12px;color:var(--fa);margin-bottom:24px;}
+
+/* MISC */
+#toast{position:fixed;top:20px;right:24px;z-index:2000;border-radius:12px;padding:12px 20px;font-size:13px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,0.18);color:#fff;display:none;max-width:340px;}
+.badge{background:#fbbf24;color:#2d1417;border-radius:20px;padding:0 6px;font-size:10px;font-weight:700;}
+#loader{position:fixed;inset:0;background:rgba(45,20,23,0.35);z-index:8000;display:none;align-items:center;justify-content:center;}
+.loader-box{background:#fff;border-radius:14px;padding:24px 32px;font-size:14px;color:var(--deep);font-weight:600;display:flex;align-items:center;gap:12px;}
+.spin{width:20px;height:20px;border:3px solid #f5d5d8;border-top-color:#9b2335;border-radius:50%;animation:spin 0.7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="icon">🏥</div>
+      <h1>Salma Rahba<br/>Rehabilitation Medicine</h1>
+      <p>Hospital Rounding System</p>
+    </div>
+    <div class="lf"><label>Email</label><input type="email" id="le" placeholder="your@email.com" autocomplete="email"/></div>
+    <div class="lf"><label>Password</label><input type="password" id="lp" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"/></div>
+    <button class="login-btn" id="login-btn" onclick="doLogin()">Sign In</button>
+    <div class="login-err" id="login-err"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <header id="header">
+    <div class="hdr-brand">
+      <div class="hdr-icon">🏥</div>
+      <div><div class="hdr-title">Salma Rahba Rehabilitation Medicine</div><div class="hdr-sub">Hospital Rounding System</div></div>
+    </div>
+    <div class="hdr-actions">
+      <button class="hdr-btn" onclick="openSheetModal()">🔗 Google Sheet <span id="sync-ind"></span></button>
+      <button class="hdr-btn" id="sync-now-btn" onclick="syncNow()" style="display:none">🔄 Sync Now</button>
+      <button class="hdr-btn" onclick="openArchiveModal()">🗄️ Archive <span class="badge" id="arc-count" style="display:none"></span></button>
+      <span class="hdr-date" id="hdr-date"></span>
+      <span class="hdr-user" id="hdr-user"></span>
+      <div class="hdr-avatar" id="hdr-av" onclick="doLogout()" title="Click to sign out">?</div>
+    </div>
+  </header>
+  <div id="body">
+    <aside id="sidebar">
+      <div class="sidebar-top">
+        <div class="sidebar-hdr"><span class="sidebar-lbl">Patients</span><button class="btn-add" onclick="openAddModal()">+ Add</button></div>
+        <input class="search-input" type="text" placeholder="Search name, room, MRN…" oninput="onSearch(this.value)"/>
+      </div>
+      <div id="patient-list"></div>
+      <div class="sidebar-foot" id="sidebar-foot"></div>
+    </aside>
+    <div id="main"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<div id="loader"><div class="loader-box"><div class="spin"></div><span id="loader-msg">Loading…</span></div></div>
+<div id="modal-overlay" class="modal-overlay" style="display:none" onclick="handleOverlayClick(event)"><div id="modal-content"></div></div>
+
+<script>
+// ═══════════════════════════════════════
+//  SUPABASE INIT
+// ═══════════════════════════════════════
+const { createClient } = supabase;
+const db = createClient(
+  "https://rlysdurcxsdtpdohewjo.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJseXNkdXJjeHNkdHBkb2hld2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MTI5MzksImV4cCI6MjA5MTQ4ODkzOX0.0jy9hBiYbP0yVdvly6XTjrrzzb19SjysYMbwVFov1zQ"
+);
+
+// ═══════════════════════════════════════
+//  CONSTANTS
+// ═══════════════════════════════════════
+const CLSS = ["ABM","LC","LTC","SSR","PAR"];
+const WARDS = [
+  {id:"Ward A",label:"Ward A",dc:"ward-dot-warda",bc:"wbadge-warda"},
+  {id:"Ward B",label:"Ward B",dc:"ward-dot-wardb",bc:"wbadge-wardb"},
+  {id:"ICU 1", label:"ICU 1", dc:"ward-dot-icu1", bc:"wbadge-icu1"},
+  {id:"ICU 2", label:"ICU 2", dc:"ward-dot-icu2", bc:"wbadge-icu2"},
+];
+const DEF_CHK = {stable:false,unstable:false,bariatricWheelchair:false,comfortWheelchair:false,highframeWalker:false,hoist:false,medicalBed:false,sling:false,standardWalker:false,standardWheelchair:false,wheeledWalker:false};
+
+// ═══════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════
+let S = { patients:[], archive:[], selected:null, search:"", sheetUrl:localStorage.getItem("cr_sheet")||"", syncSt:"idle" };
+let currentUser=null, currentName="";
+const collapsed = new Set();
+
+// ═══════════════════════════════════════
+//  UTILS
+// ═══════════════════════════════════════
+const esc=s=>String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+const fmt=iso=>new Date(iso).toLocaleString("en-US",{month:"short",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit",hour12:true});
+const wkey=w=>w.toLowerCase().replace(/\s+/g,"");
+const wbc=w=>`wbadge wbadge-${wkey(w||"Ward A")}`;
+let _tt;
+function toast(msg,color="#9b2335"){const e=document.getElementById("toast");e.textContent=msg;e.style.background=color;e.style.display="block";clearTimeout(_tt);_tt=setTimeout(()=>e.style.display="none",3500);}
+function loader(msg){document.getElementById("loader-msg").textContent=msg||"Loading…";document.getElementById("loader").style.display="flex";}
+function noloader(){document.getElementById("loader").style.display="none";}
+function getSel(){return S.patients.find(p=>p.id===S.selected);}
+
+// ═══════════════════════════════════════
+//  AUTH
+// ═══════════════════════════════════════
+async function doLogin(){
+  const email=document.getElementById("le").value.trim();
+  const pass=document.getElementById("lp").value;
+  const err=document.getElementById("login-err");
+  const btn=document.getElementById("login-btn");
+  err.textContent="";
+  if(!email||!pass){err.textContent="Please enter email and password.";return;}
+  btn.disabled=true;btn.textContent="Signing in…";
+  const {data,error}=await db.auth.signInWithPassword({email,password:pass});
+  btn.disabled=false;btn.textContent="Sign In";
+  if(error){err.textContent=error.message;return;}
+  await onLogin(data.user);
+}
+async function onLogin(user){
+  currentUser=user;
+  currentName=user.user_metadata?.full_name||user.email.split("@")[0];
+  document.getElementById("login-screen").style.display="none";
+  document.getElementById("app").style.display="flex";
+  const av=document.getElementById("hdr-av");
+  av.textContent=currentName.slice(0,2).toUpperCase();
+  av.title=`Signed in as ${user.email} — click to sign out`;
+  document.getElementById("hdr-user").textContent=currentName;
+  loader("Loading patients…");
+  await loadAll();
+  noloader();
+  render();
+}
+async function doLogout(){
+  if(!confirm("Sign out?"))return;
+  await db.auth.signOut();location.reload();
+}
+(async()=>{const {data}=await db.auth.getSession();if(data?.session?.user)await onLogin(data.session.user);})();
+
+// ═══════════════════════════════════════
+//  DB LOAD
+// ═══════════════════════════════════════
+async function loadAll(){
+  const [pR,nR,rR]=await Promise.all([
+    db.from("patients").select("*").order("created_at"),
+    db.from("notes").select("*").order("created_at"),
+    db.from("replies").select("*").order("created_at"),
+  ]);
+  const repMap={};
+  (rR.data||[]).forEach(r=>{if(!repMap[r.note_id])repMap[r.note_id]=[];repMap[r.note_id].push(r2l(r));});
+  const noteMap={};
+  (nR.data||[]).forEach(n=>{const k=n.patient_id+"_"+n.note_type;if(!noteMap[k])noteMap[k]=[];noteMap[k].push(n2l(n,repMap[n.id]||[]));});
+  S.patients=[];S.archive=[];
+  (pR.data||[]).forEach(p=>{
+    const lp=p2l(p,noteMap);
+    if(p.is_archived)S.archive.push({...lp,archivedAt:p.archived_at});
+    else S.patients.push(lp);
+  });
+  if(!S.selected&&S.patients.length)S.selected=S.patients[0].id;
+}
+const p2l=(p,nm)=>({
+  id:p.id,room:p.room,name:p.name,mrn:p.mrn,
+  primaryPt:p.primary_pt||"",primaryOt:p.primary_ot||"",primarySlp:p.primary_slp||"",
+  classification:p.classification||"ABM",highPriority:p.high_priority||false,isUrgent:p.is_urgent||false,
+  ward:p.ward||"Ward A",checklist:{...DEF_CHK,...(p.checklist||{})},equipOthers:p.equip_others||"",
+  physicianNotes:"",roundNotes:"",ptNotes:"",otNotes:"",slpNotes:"",
+  physicianHistory:nm[p.id+"_physician"]||[],roundHistory:nm[p.id+"_round"]||[],
+  ptHistory:nm[p.id+"_pt"]||[],otHistory:nm[p.id+"_ot"]||[],slpHistory:nm[p.id+"_slp"]||[],
+});
+const n2l=(n,replies)=>({id:n.id,text:n.text,ts:n.created_at,authorName:n.author_name||"",editedAt:n.edited_at,replies});
+const r2l=r=>({id:r.id,text:r.text,ts:r.created_at,authorName:r.author_name||""});
+function updL(id,changes){S.patients=S.patients.map(p=>p.id===id?{...p,...changes}:p);}
+
+// ═══════════════════════════════════════
+//  RENDER
+// ═══════════════════════════════════════
+function render(){renderHdr();renderSidebar();renderMain();}
+
+function renderHdr(){
+  document.getElementById("hdr-date").textContent=new Date().toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});
+  document.getElementById("sync-now-btn").style.display=S.sheetUrl?"":"none";
+  document.getElementById("sync-ind").textContent=S.syncSt==="syncing"?" ⏳":S.syncSt==="ok"?" ✓":S.syncSt==="error"?" ⚠️":"";
+  const ac=document.getElementById("arc-count");
+  if(S.archive.length>0){ac.style.display="";ac.textContent=S.archive.length;}else ac.style.display="none";
+}
+
+function renderSidebar(){
+  const q=S.search.toLowerCase();
+  const filt=S.patients.filter(p=>p.name.toLowerCase().includes(q)||p.room.toLowerCase().includes(q)||p.mrn.toLowerCase().includes(q)||(p.ward||"").toLowerCase().includes(q));
+  const hpC=S.patients.filter(p=>p.highPriority).length;
+  const urgC=S.patients.filter(p=>p.isUrgent).length;
+
+  const buildRow=p=>{
+    const isAct=p.id===S.selected;
+    const done=Object.values(p.checklist).filter(Boolean).length;
+    return `<div class="pat-row${isAct?" active":""}" onclick="selPat('${p.id}')">
+      <div class="row-top">
+        <div style="display:flex;align-items:center;gap:7px">
+          <span class="row-room">${esc(p.room)}</span>
+          ${p.isUrgent?"<span title='Urgent'>🔴</span>":""}
+          ${p.highPriority?"<span title='Priority'>🚩</span>":""}
+          ${p.checklist.unstable?"<span title='Unstable'>⚠️</span>":""}
+        </div>
+        <span class="cls-badge cls-${p.classification}">${p.classification}</span>
+      </div>
+      <div class="row-name">${esc(p.name)}</div>
+      <div class="row-mrn">${esc(p.mrn)}</div>
+      <div class="row-bot">
+        <span class="row-pt">${esc(p.primaryPt||"")}</span>
+        <span class="row-done${done>=2?" complete":""}">${done}/11</span>
+      </div>
+      <div class="row-acts">
+        <button class="re-btn" onclick="event.stopPropagation();openEditModal('${p.id}')">✏️</button>
+        <button class="ra-btn" onclick="event.stopPropagation();openArcConfirm('${p.id}')">Archive</button>
+        <button class="rd-btn" onclick="event.stopPropagation();openDelConfirm('${p.id}')">🗑️</button>
+      </div>
+    </div>`;
+  };
+  const sortR=arr=>[...arr].sort((a,b)=>{const nA=parseInt(a.room)||0,nB=parseInt(b.room)||0;return nA!==nB?nA-nB:a.room.localeCompare(b.room);});
+
+  let html="";
+  const urgP=sortR(filt.filter(p=>p.isUrgent));
+  if(urgP.length>0){const c=collapsed.has("__urg__");html+=`<div class="ward-section urg-section"><button class="ward-hdr urg-hdr" onclick="togWard('__urg__')"><span>🔴</span><span class="ward-name" style="color:#dc2626">Urgent</span><span class="ward-cnt" style="background:#fee2e2;color:#991b1b">${urgP.length}</span><span class="ward-chev">${c?"▶":"▼"}</span></button><div class="ward-pats${c?" collapsed":""}">${urgP.map(buildRow).join("")}</div></div>`;}
+  const priP=sortR(filt.filter(p=>p.highPriority));
+  if(priP.length>0){const c=collapsed.has("__pri__");html+=`<div class="ward-section pri-section"><button class="ward-hdr pri-hdr" onclick="togWard('__pri__')"><span>🚩</span><span class="ward-name" style="color:#9b2335">Priority</span><span class="ward-cnt" style="background:#fad5d9;color:#7b1f2e">${priP.length}</span><span class="ward-chev">${c?"▶":"▼"}</span></button><div class="ward-pats${c?" collapsed":""}">${priP.map(buildRow).join("")}</div></div>`;}
+  WARDS.forEach(w=>{
+    const wp=sortR(filt.filter(p=>(p.ward||"Ward A")===w.id));
+    const c=collapsed.has(w.id);
+    const ac=S.patients.filter(p=>(p.ward||"Ward A")===w.id).length;
+    html+=`<div class="ward-section"><button class="ward-hdr" onclick="togWard('${w.id}')"><span class="ward-dot ${w.dc}"></span><span class="ward-name">${w.label}</span><span class="ward-cnt">${ac}</span><span class="ward-chev">${c?"▶":"▼"}</span></button><div class="ward-pats${c?" collapsed":""}">
+      ${wp.length===0?`<div class="empty-list" style="padding:10px 14px;font-size:11px">No patients${q?" matching":""}.</div>`:wp.map(buildRow).join("")}
+    </div></div>`;
+  });
+  document.getElementById("patient-list").innerHTML=html||`<div class="empty-list">No patients found.</div>`;
+  document.getElementById("sidebar-foot").textContent=`${filt.length} patient${filt.length!==1?"s":""} · ${urgC} urgent · ${hpC} priority`;
+}
+
+function renderMain(){
+  const main=document.getElementById("main");
+  const p=getSel();
+  if(!p){main.innerHTML=`<div class="empty-main" style="display:flex"><div class="big-icon" style="font-size:48px">🏥</div><p style="font-size:15px;color:var(--mu)">No patients yet.</p><button class="btn-primary" style="flex:none;padding:10px 22px;border-radius:10px" onclick="openAddModal()">+ Add First Patient</button></div>`;return;}
+  const ini=p.name.split(" ").map(n=>n[0]).join("").slice(0,2);
+  main.innerHTML=`
+  <div class="pat-card">
+    <div class="pat-card-l">
+      <div class="pat-avatar">${esc(ini)}</div>
+      <div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span class="pat-fullname">${esc(p.name)}</span>
+          ${p.isUrgent?'<span class="urg-badge">🔴 URGENT</span>':""}
+          ${p.highPriority?'<span class="pri-badge">🚩 PRIORITY</span>':""}
+        </div>
+        <div class="pat-meta">
+          <span>Room ${esc(p.room)}</span><span>${esc(p.mrn)}</span>
+          ${p.primaryPt?`<span>🦵 PT: ${esc(p.primaryPt)}</span>`:""}
+          ${p.primaryOt?`<span>🖐️ OT: ${esc(p.primaryOt)}</span>`:""}
+          ${p.primarySlp?`<span>🗣️ SLP: ${esc(p.primarySlp)}</span>`:""}
+        </div>
+      </div>
+    </div>
+    <div class="pat-card-r">
+      <button class="edit-pat-btn" onclick="openEditModal('${p.id}')">✏️ Edit</button>
+      <span class="${wbc(p.ward)}" style="font-size:12px;padding:5px 14px;font-weight:700">${esc(p.ward||"Ward A")}</span>
+      <span class="cls-badge cls-${p.classification}" style="font-size:12px;padding:5px 14px;font-weight:700">${p.classification}</span>
+    </div>
+  </div>
+  <div class="chk-card">
+    <div class="card-hdr"><span>📋</span><span class="card-hdr-lbl">ROUNDING CHECKLIST</span></div>
+    <div class="chk-items">
+      ${rCk(p,"stable","Stable","✅","#16a34a","#dcfce7","#166534")}
+      ${rCk(p,"unstable","Unstable","⚠️","#dc2626","#fee2e2","#991b1b")}
+    </div>
+    <div class="chk-divider"><span>📦 Equipment Order</span></div>
+    <div class="chk-items" style="flex-wrap:wrap;gap:10px">
+      ${rEq(p,"bariatricWheelchair","Bariatric Wheelchair","♿")}
+      ${rEq(p,"comfortWheelchair","Comfort Wheelchair","🪑")}
+      ${rEq(p,"highframeWalker","Highframe Walker","🦯")}
+      ${rEq(p,"hoist","Hoist","🏗️")}
+      ${rEq(p,"medicalBed","Medical Bed","🛏️")}
+      ${rEq(p,"sling","Sling","🩹")}
+      ${rEq(p,"standardWalker","Standard Walker","🚶")}
+      ${rEq(p,"standardWheelchair","Standard Wheelchair","🦽")}
+      ${rEq(p,"wheeledWalker","Wheeled Walker","🛞")}
+    </div>
+    <div style="padding:0 20px 16px">
+      <label style="font-size:11px;font-weight:700;color:#9b6670;text-transform:uppercase;letter-spacing:0.07em;display:block;margin-bottom:6px">Others (free text)</label>
+      <input type="text" class="eq-other" id="eq-o-${p.id}" value="${esc(p.equipOthers||"")}" placeholder="e.g. Transfer board, cushion…" oninput="onEqO('${p.id}',this.value)"/>
+    </div>
+  </div>
+  <div class="notes-wrap">
+    ${rNS(p,"physician","🩺","PHYSICIAN ORDER NOTES","Enter physician orders…",false)}
+    ${rNS(p,"round","📝","ROUND NOTES","Document rounding observations…",true)}
+    ${rNS(p,"pt","🦵","PT NOTES","Record physical therapy sessions…",true)}
+    ${rNS(p,"ot","🖐️","OT NOTES","Record occupational therapy sessions…",true)}
+    ${rNS(p,"slp","🗣️","SLP NOTES","Record speech-language pathology sessions…",true)}
+  </div>
+  <div style="height:24px"></div>`;
+}
+
+function rCk(p,key,lbl,icon,ac,ab,at){
+  const ch=p.checklist[key];
+  return `<button class="chk-btn" onclick="togChk('${p.id}','${key}')" style="${ch?`border-color:${ac};background:linear-gradient(135deg,${ab},#fff8f8)`:""}">
+    <div class="chk-box" style="${ch?`background:${ac}`:""}"> ${ch?icon:""}</div>
+    <div><div class="chk-lbl" style="${ch?`color:${at}`:""}"> ${lbl}</div>
+    <div class="chk-sub" style="${ch?`color:${ac}`:""}"> ${ch?"Marked":"Tap to mark"}</div></div>
+  </button>`;
+}
+function rEq(p,key,lbl,icon){
+  const ch=p.checklist[key]||false;
+  return `<button class="eq-btn${ch?" checked":""}" onclick="togChk('${p.id}','${key}')">
+    <span class="eq-icon">${icon}</span><span class="eq-lbl">${lbl}</span>
+    ${ch?'<span class="eq-chk">✓</span>':""}
+  </button>`;
+}
+
+function rNS(p,type,icon,title,placeholder,replies){
+  const dk=type+"Notes",hk=type+"History";
+  const draft=p[dk]||"",hist=p[hk]||[],hasT=draft.trim().length>0;
+  const hHTML=hist.length===0?"":
+    `<div class="note-hist"><div class="note-hist-lbl">Saved Notes</div>
+    ${[...hist].reverse().map(n=>{
+      const el=n.editedAt?`<span class="etag">edited ${fmt(n.editedAt)}</span>`:"";
+      const reps=n.replies||[];
+      const rThread=reps.length===0?"":
+        `<div class="reply-thread">${reps.map(r=>`<div class="reply-entry">
+          <div class="reply-meta"><span>↩️</span><span class="reply-ts">Reply · ${fmt(r.ts)}</span>
+          ${r.authorName?`<span class="reply-author">${esc(r.authorName)}</span>`:""}
+          <button class="reply-del" onclick="delReply('${p.id}','${hk}','${n.id}','${r.id}')">✕ Remove</button></div>
+          <div class="reply-text">${esc(r.text)}</div>
+        </div>`).join("")}</div>`;
+      const rInp=!replies?"":
+        `<div class="reply-input" id="ri-${n.id}">
+          <textarea class="reply-ta" id="rta-${n.id}" placeholder="Write a reply…"></textarea>
+          <div class="reply-acts">
+            <button class="reply-cancel" onclick="cancelReply('${n.id}')">Cancel</button>
+            <button class="reply-post" onclick="postReply('${p.id}','${hk}','${n.id}')">Post Reply</button>
+          </div>
+        </div>`;
+      return `<div class="note-entry" id="ne-${n.id}">
+        <div class="note-entry-hdr">
+          <span class="note-ts" onclick="togView('${n.id}')">🕐 ${fmt(n.ts)}${el}</span>
+          ${n.authorName?`<span class="note-author">✍️ ${esc(n.authorName)}</span>`:""}
+          <div class="note-acts">
+            <button class="ne-btn ne-view" onclick="togView('${n.id}')" id="vbtn-${n.id}">▼ View</button>
+            ${replies?`<button class="ne-btn ne-rep" onclick="openReply('${n.id}')">💬 Reply</button>`:""}
+            <button class="ne-btn ne-edit" onclick="togEdit('${p.id}','${hk}','${n.id}')">✏️ Edit</button>
+            <button class="ne-btn ne-del" onclick="promptDel('${p.id}','${hk}','${n.id}')">🗑 Delete</button>
+          </div>
+        </div>
+        <div class="note-body" id="nb-${n.id}">${esc(n.text)}</div>
+        ${rThread}${rInp}
+        <div class="note-edit-area" id="ea-${n.id}">
+          <textarea class="note-edit-ta" id="eta-${n.id}">${esc(n.text)}</textarea>
+          <div class="note-edit-foot">
+            <button class="ne-cancel" onclick="cancelEdit('${p.id}','${hk}','${n.id}')">Cancel</button>
+            <button class="ne-save" onclick="commitEdit('${p.id}','${hk}','${n.id}')">Save Changes</button>
+          </div>
+        </div>
+        <div class="del-confirm" id="dc-${n.id}">
+          <span class="del-msg">⚠️ Delete this note permanently?</span>
+          <div class="del-acts">
+            <button class="dc-cancel" onclick="cancelDel('${n.id}')">Cancel</button>
+            <button class="dc-confirm" onclick="commitDel('${p.id}','${hk}','${n.id}')">Delete</button>
+          </div>
+        </div>
+      </div>`;
+    }).join("")}
+    </div>`;
+  return `<div class="note-card">
+    <div class="note-hdr"><span>${icon}</span><span class="note-hdr-lbl">${title}</span>
+      ${hist.length>0?`<span class="note-cnt">${hist.length} saved ${hist.length===1?"note":"notes"}</span>`:""}
+    </div>
+    <div class="note-input-area">
+      <textarea class="note-ta" placeholder="${placeholder}" oninput="onNI('${p.id}','${dk}',this)" id="nta-${type}-${p.id}">${esc(draft)}</textarea>
+      <div class="note-save-row">
+        <button class="note-save-btn${hasT?" active":""}" id="nsb-${type}-${p.id}" onclick="saveNote('${p.id}','${dk}','${hk}')">Save Note</button>
+      </div>
+    </div>${hHTML}
+  </div>`;
+}
+
+// ═══════════════════════════════════════
+//  ACTIONS
+// ═══════════════════════════════════════
+function selPat(id){S.selected=id;renderSidebar();renderMain();}
+function onSearch(v){S.search=v;renderSidebar();}
+function togWard(id){if(collapsed.has(id))collapsed.delete(id);else collapsed.add(id);renderSidebar();}
+
+async function togChk(pid,key){
+  const p=S.patients.find(x=>x.id===pid);if(!p)return;
+  const nc={...p.checklist,[key]:!p.checklist[key]};
+  updL(pid,{checklist:nc});renderMain();renderSidebar();
+  await db.from("patients").update({checklist:nc,updated_at:new Date().toISOString()}).eq("id",pid);
+}
+function onEqO(pid,val){
+  updL(pid,{equipOthers:val});
+  clearTimeout(window._eqt);
+  window._eqt=setTimeout(()=>db.from("patients").update({equip_others:val,updated_at:new Date().toISOString()}).eq("id",pid),600);
+}
+function onNI(pid,field,el){
+  updL(pid,{[field]:el.value});
+  const type=field.replace("Notes","");
+  const btn=document.getElementById(`nsb-${type}-${pid}`);
+  if(btn)btn.className="note-save-btn"+(el.value.trim().length>0?" active":"");
+}
+
+async function saveNote(pid,draftF,histF){
+  const p=S.patients.find(x=>x.id===pid);if(!p||!p[draftF]?.trim())return;
+  loader("Saving note…");
+  const type=draftF.replace("Notes","");
+  const {data:nd,error}=await db.from("notes").insert({patient_id:pid,note_type:type,text:p[draftF].trim(),author_name:currentName,author_id:currentUser?.id}).select().single();
+  noloader();if(error){toast("Failed to save note.","#dc2626");return;}
+  const saved=n2l(nd,[]);
+  const changes={[histF]:[...(p[histF]||[]),saved],[draftF]:""};
+  const tracked=["physicianHistory","roundHistory","ptHistory","otHistory","slpHistory"];
+  if(tracked.includes(histF)){
+    if(p.highPriority){changes.highPriority=false;await db.from("patients").update({high_priority:false,updated_at:new Date().toISOString()}).eq("id",pid);toast(`Priority flag removed — note saved.`,"#9b2335");}
+    if(p.isUrgent){changes.isUrgent=false;await db.from("patients").update({is_urgent:false,updated_at:new Date().toISOString()}).eq("id",pid);toast(`Urgent flag removed — note saved.`,"#dc2626");}
+  }
+  updL(pid,changes);renderMain();renderSidebar();
+  if(!changes.highPriority&&!changes.isUrgent)toast("Note saved ✓","#16a34a");
+}
+
+// note view/edit/delete
+function togView(id){
+  const b=document.getElementById("nb-"+id),v=document.getElementById("vbtn-"+id),e=document.getElementById("ea-"+id),d=document.getElementById("dc-"+id);
+  if(e?.classList.contains("open")||d?.classList.contains("open"))return;
+  const o=b.classList.toggle("open");if(v)v.textContent=o?"▲ Hide":"▼ View";
+}
+function closeExtras(ex){
+  document.querySelectorAll(".note-edit-area.open").forEach(e=>{if(!ex||e.id!=="ea-"+ex)e.classList.remove("open");});
+  document.querySelectorAll(".del-confirm.open").forEach(e=>{if(!ex||e.id!=="dc-"+ex)e.classList.remove("open");});
+  document.querySelectorAll(".reply-input.open").forEach(e=>{if(!ex||e.id!=="ri-"+ex)e.classList.remove("open");});
+}
+function togEdit(pid,hk,nid){
+  closeExtras(nid);
+  const b=document.getElementById("nb-"+nid),v=document.getElementById("vbtn-"+nid),e=document.getElementById("ea-"+nid);
+  if(!e)return;const o=e.classList.toggle("open");
+  if(o){if(b)b.classList.remove("open");if(v)v.textContent="▼ View";const ta=document.getElementById("eta-"+nid);if(ta){ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length);}}
+}
+function cancelEdit(pid,hk,nid){
+  document.getElementById("ea-"+nid)?.classList.remove("open");
+  const p=S.patients.find(x=>x.id===pid);if(p){const n=(p[hk]||[]).find(x=>x.id===nid);if(n){const ta=document.getElementById("eta-"+nid);if(ta)ta.value=n.text;}}
+}
+async function commitEdit(pid,hk,nid){
+  const ta=document.getElementById("eta-"+nid);if(!ta)return;
+  const t=ta.value.trim();if(!t){toast("Note cannot be empty.","#dc2626");return;}
+  loader("Updating note…");
+  await db.from("notes").update({text:t,edited_at:new Date().toISOString()}).eq("id",nid);
+  noloader();
+  const p=S.patients.find(x=>x.id===pid);if(!p)return;
+  updL(pid,{[hk]:(p[hk]||[]).map(n=>n.id===nid?{...n,text:t,editedAt:new Date().toISOString()}:n)});
+  renderMain();toast("Note updated ✓","#16a34a");
+}
+function promptDel(pid,hk,nid){
+  closeExtras(nid);const b=document.getElementById("nb-"+nid),v=document.getElementById("vbtn-"+nid);
+  if(b)b.classList.remove("open");if(v)v.textContent="▼ View";
+  document.getElementById("dc-"+nid)?.classList.add("open");
+}
+function cancelDel(nid){document.getElementById("dc-"+nid)?.classList.remove("open");}
+async function commitDel(pid,hk,nid){
+  loader("Deleting note…");
+  await db.from("notes").delete().eq("id",nid);
+  noloader();
+  const p=S.patients.find(x=>x.id===pid);if(!p)return;
+  updL(pid,{[hk]:(p[hk]||[]).filter(n=>n.id!==nid)});
+  renderMain();toast("Note deleted.","#64748b");
+}
+
+// replies
+function openReply(nid){
+  closeExtras(nid);
+  const b=document.getElementById("nb-"+nid),v=document.getElementById("vbtn-"+nid);
+  if(b&&!b.classList.contains("open")){b.classList.add("open");if(v)v.textContent="▲ Hide";}
+  const a=document.getElementById("ri-"+nid);if(a){a.classList.add("open");document.getElementById("rta-"+nid)?.focus();}
+}
+function cancelReply(nid){
+  document.getElementById("ri-"+nid)?.classList.remove("open");
+  const ta=document.getElementById("rta-"+nid);if(ta)ta.value="";
+}
+async function postReply(pid,hk,nid){
+  const ta=document.getElementById("rta-"+nid);if(!ta)return;
+  const t=ta.value.trim();if(!t){toast("Reply cannot be empty.","#dc2626");return;}
+  loader("Posting reply…");
+  const {data,error}=await db.from("replies").insert({note_id:nid,text:t,author_name:currentName,author_id:currentUser?.id}).select().single();
+  noloader();if(error){toast("Failed to post reply.","#dc2626");return;}
+  const rep=r2l(data);
+  const p=S.patients.find(x=>x.id===pid);if(!p)return;
+  updL(pid,{[hk]:(p[hk]||[]).map(n=>n.id===nid?{...n,replies:[...(n.replies||[]),rep]}:n)});
+  renderMain();toast("Reply posted ✓","#16a34a");
+}
+async function delReply(pid,hk,nid,rid){
+  loader("Removing reply…");
+  await db.from("replies").delete().eq("id",rid);
+  noloader();
+  const p=S.patients.find(x=>x.id===pid);if(!p)return;
+  updL(pid,{[hk]:(p[hk]||[]).map(n=>n.id===nid?{...n,replies:(n.replies||[]).filter(r=>r.id!==rid)}:n)});
+  renderMain();toast("Reply removed.","#64748b");
+}
+
+// ═══════════════════════════════════════
+//  MODALS
+// ═══════════════════════════════════════
+function showModal(html,wide,arcBox){
+  const mc=document.getElementById("modal-content");
+  mc.className="modal-box"+(wide?" wide":"")+(arcBox?" arc-box":"");
+  mc.innerHTML=html;document.getElementById("modal-overlay").style.display="flex";
+}
+function closeModal(){document.getElementById("modal-overlay").style.display="none";}
+function handleOverlayClick(e){if(e.target===document.getElementById("modal-overlay"))closeModal();}
+
+function openAddModal(){showModal(patForm(null));}
+function openEditModal(id){const p=S.patients.find(x=>x.id===id);if(p)showModal(patForm(p));}
+
+function patForm(p){
+  const ie=!!p,v=p||{room:"",name:"",mrn:"",primaryPt:"",primaryOt:"",primarySlp:"",classification:"ABM",highPriority:false,isUrgent:false,ward:"Ward A"};
+  const opts=CLSS.map(c=>`<option value="${c}"${c===v.classification?" selected":""}>${c}</option>`).join("");
+  const wOpts=WARDS.map(w=>`<option value="${w.id}"${w.id===(v.ward||"Ward A")?" selected":""}>${w.label}</option>`).join("");
+  return `<div class="modal-head"><span class="modal-title">${ie?"✏️ Edit Patient":"➕ Add Patient"}</span><button class="modal-close" onclick="closeModal()">×</button></div>
+  <div class="modal-body">
+    <div class="g2">
+      <div><label class="fl">Room #</label><input class="fi" id="fr" value="${esc(v.room)}" placeholder="e.g. 101A"/></div>
+      <div><label class="fl">MRN</label><input class="fi" id="fm" value="${esc(v.mrn)}" placeholder="e.g. MRN-001234"/></div>
+    </div>
+    <div><label class="fl">Patient Name</label><input class="fi" id="fn" value="${esc(v.name)}" placeholder="Full name"/></div>
+    <div class="g2">
+      <div><label class="fl">Primary PT</label><input class="fi" id="fpt" value="${esc(v.primaryPt||"")}" placeholder="e.g. Dr. Rivera"/></div>
+      <div><label class="fl">Primary OT</label><input class="fi" id="fot" value="${esc(v.primaryOt||"")}" placeholder="e.g. Dr. Kim"/></div>
+    </div>
+    <div><label class="fl">Primary SLP</label><input class="fi" id="fslp" value="${esc(v.primarySlp||"")}" placeholder="e.g. Dr. Patel"/></div>
+    <div class="g2">
+      <div><label class="fl">Ward</label><select class="fi" id="fw">${wOpts}</select></div>
+      <div><label class="fl">Classification</label><select class="fi" id="fc">${opts}</select></div>
+    </div>
+    <div class="g2">
+      <div><label class="fl">Priority</label>
+        <button class="ptoggle${v.highPriority?" on":""}" id="fpb" onclick="togP()">🚩 <span id="fpl">${v.highPriority?"Priority":"Normal"}</span></button>
+        <input type="hidden" id="fp" value="${v.highPriority?1:0}"/>
+      </div>
+      <div><label class="fl">Urgent</label>
+        <button class="utoggle${v.isUrgent?" on":""}" id="fub" onclick="togU()">🔴 <span id="ful">${v.isUrgent?"Urgent":"Normal"}</span></button>
+        <input type="hidden" id="fu" value="${v.isUrgent?1:0}"/>
+      </div>
+    </div>
+    <div class="modal-acts">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="subPat(${ie?`'${v.id}'`:"null"})">${ie?"Save Changes":"Add Patient"}</button>
+    </div>
+  </div>`;
+}
+function togP(){const i=document.getElementById("fp"),b=document.getElementById("fpb"),l=document.getElementById("fpl");const o=i.value==="1";i.value=o?"0":"1";b.className="ptoggle"+(o?"":" on");l.textContent=o?"Normal":"Priority";}
+function togU(){const i=document.getElementById("fu"),b=document.getElementById("fub"),l=document.getElementById("ful");const o=i.value==="1";i.value=o?"0":"1";b.className="utoggle"+(o?"":" on");l.textContent=o?"Normal":"Urgent";}
+
+async function subPat(eid){
+  const room=document.getElementById("fr").value.trim(),mrn=document.getElementById("fm").value.trim(),name=document.getElementById("fn").value.trim();
+  const primaryPt=document.getElementById("fpt").value.trim(),primaryOt=document.getElementById("fot").value.trim(),primarySlp=document.getElementById("fslp").value.trim();
+  const cls=document.getElementById("fc").value,ward=document.getElementById("fw").value;
+  const hp=document.getElementById("fp").value==="1",isUrgent=document.getElementById("fu").value==="1";
+  if(!room||!mrn||!name){toast("Please fill in Room, MRN and Patient Name.","#dc2626");return;}
+  loader(eid?"Saving…":"Adding…");
+  if(eid!==null){
+    const {error}=await db.from("patients").update({room,mrn,name,primary_pt:primaryPt,primary_ot:primaryOt,primary_slp:primarySlp,classification:cls,high_priority:hp,is_urgent:isUrgent,ward,updated_at:new Date().toISOString()}).eq("id",eid);
+    noloader();if(error){toast("Failed: "+error.message,"#dc2626");return;}
+    updL(eid,{room,mrn,name,primaryPt,primaryOt,primarySlp,classification:cls,highPriority:hp,isUrgent,ward});
+  }else{
+    const {data,error}=await db.from("patients").insert({room,mrn,name,primary_pt:primaryPt,primary_ot:primaryOt,primary_slp:primarySlp,classification:cls,high_priority:hp,is_urgent:isUrgent,ward,checklist:DEF_CHK,equip_others:""}).select().single();
+    noloader();if(error){toast("Failed: "+error.message,"#dc2626");return;}
+    S.patients.push(p2l(data,{}));S.selected=data.id;
+  }
+  closeModal();render();
+}
+
+function openArcConfirm(id){
+  const p=S.patients.find(x=>x.id===id);if(!p)return;
+  showModal(`<div class="confirm-box"><div class="conf-icon">🗄️</div><div class="conf-title">Archive Patient?</div><div class="conf-msg"><strong>${esc(p.name)}</strong> (Room ${esc(p.room)}) will be moved to the archive.</div><div class="conf-sub">Restore later by name or MRN.</div><div class="modal-acts" style="width:100%"><button class="btn-cancel" onclick="closeModal()">Cancel</button><button class="btn-danger" onclick="arcPat('${id}')">Archive</button></div></div>`);
+}
+async function arcPat(id){
+  const p=S.patients.find(x=>x.id===id);if(!p)return;
+  loader("Archiving…");
+  await db.from("patients").update({is_archived:true,archived_at:new Date().toISOString()}).eq("id",id);
+  noloader();
+  S.archive.push({...p,archivedAt:new Date().toISOString()});
+  S.patients=S.patients.filter(x=>x.id!==id);
+  S.selected=S.patients[0]?.id??null;
+  closeModal();render();toast(`${p.name} archived.`,"#7c3aed");
+}
+
+function openDelConfirm(id){
+  const p=S.patients.find(x=>x.id===id);if(!p)return;
+  showModal(`<div class="confirm-box"><div class="conf-icon">🗑️</div><div class="conf-title">Delete Patient?</div><div class="conf-msg"><strong>${esc(p.name)}</strong> will be <strong>permanently deleted</strong>.</div><div class="conf-sub">Cannot be undone. All notes and history will be lost.</div><div class="modal-acts" style="width:100%"><button class="btn-cancel" onclick="closeModal()">Cancel</button><button class="btn-danger" onclick="permDel('${id}')">Delete Permanently</button></div></div>`);
+}
+async function permDel(id){
+  const p=S.patients.find(x=>x.id===id);if(!p)return;
+  loader("Deleting…");
+  await db.from("patients").delete().eq("id",id);
+  noloader();
+  S.patients=S.patients.filter(x=>x.id!==id);
+  if(S.selected===id)S.selected=S.patients[0]?.id??null;
+  closeModal();render();toast(`${p.name} permanently deleted.`,"#dc2626");
+}
+
+function openArchiveModal(){renderArcModal("");}
+function renderArcModal(q){
+  const res=S.archive.filter(p=>p.name.toLowerCase().includes(q.toLowerCase())||p.mrn.toLowerCase().includes(q.toLowerCase()));
+  const rows=res.length===0?`<div class="arc-empty">${S.archive.length===0?"No archived patients yet.":"No matches found."}</div>`
+    :res.map(p=>`<div class="arc-row"><div><div class="arc-name">${esc(p.name)}</div><div class="arc-meta">${esc(p.mrn)} · Room ${esc(p.room)} · PT: ${esc(p.primaryPt||"—")}</div><div class="arc-ts">Archived ${p.archivedAt?fmt(p.archivedAt):""}</div></div><button class="btn-restore" onclick="restorePat('${p.id}')">Restore</button></div>`).join("");
+  showModal(`<div class="modal-head"><span class="modal-title">🗄️ Patient Archive</span><button class="modal-close" onclick="closeModal()">×</button></div><div class="arc-search"><input class="fi" autofocus placeholder="Search by name or MRN…" value="${esc(q)}" oninput="renderArcModal(this.value)" style="font-size:14px"/></div><div class="arc-list modal-body scroll" style="padding:0">${rows}</div>`,false,true);
+}
+async function restorePat(id){
+  loader("Restoring…");
+  await db.from("patients").update({is_archived:false,archived_at:null}).eq("id",id);
+  noloader();
+  const p=S.archive.find(x=>x.id===id);if(!p)return;
+  const {archivedAt,...patient}=p;
+  S.patients.push(patient);S.archive=S.archive.filter(x=>x.id!==id);
+  S.selected=patient.id;
+  closeModal();render();toast(`${patient.name} restored ✓`,"#16a34a");
+}
+
+// Google Sheet
+function openSheetModal(){
+  showModal(`<div class="modal-head"><span class="modal-title">🔗 Google Sheet Sync</span><button class="modal-close" onclick="closeModal()">×</button></div>
+  <div class="modal-body"><div class="info-box"><strong>How to connect:</strong><br/>1. Google Sheet → File → Share → Publish to web → CSV → Copy URL<br/><br/><strong>Required columns:</strong> room, name, mrn, primaryPt, primaryOt, primarySlp, classification, highPriority, isUrgent, ward</div>
+  <div><label class="fl">CSV Publish URL</label><input class="fi" id="su" value="${esc(S.sheetUrl)}" placeholder="https://docs.google.com/spreadsheets/d/.../pub?output=csv"/></div>
+  <div class="modal-acts"><button class="btn-cancel" onclick="closeModal()">Cancel</button><button class="btn-primary" onclick="saveSheet()">Save &amp; Sync</button></div></div>`,true);
+}
+function saveSheet(){S.sheetUrl=document.getElementById("su").value.trim();localStorage.setItem("cr_sheet",S.sheetUrl);closeModal();syncNow();}
+async function syncNow(){
+  if(!S.sheetUrl){toast("No Google Sheet URL configured.","#dc2626");return;}
+  S.syncSt="syncing";renderHdr();
+  try{
+    const res=await fetch(S.sheetUrl);if(!res.ok)throw new Error();
+    const rows=parseCSV(await res.text());if(!rows.length)throw new Error("empty");
+    loader(`Syncing ${rows.length} patients…`);
+    for(const r of rows){
+      const ex=S.patients.find(p=>p.mrn===r.mrn);
+      const upd={room:r.room,name:r.name,primary_pt:r.primaryPt||"",primary_ot:r.primaryOt||"",primary_slp:r.primarySlp||"",classification:r.classification,high_priority:r.highPriority,is_urgent:r.isUrgent||false,ward:r.ward||"Ward A",updated_at:new Date().toISOString()};
+      if(ex){await db.from("patients").update(upd).eq("id",ex.id);updL(ex.id,{room:r.room,name:r.name,primaryPt:r.primaryPt||"",primaryOt:r.primaryOt||"",primarySlp:r.primarySlp||"",classification:r.classification,highPriority:r.highPriority,isUrgent:r.isUrgent||false,ward:r.ward||"Ward A"});}
+      else{const {data}=await db.from("patients").insert({...upd,mrn:r.mrn,checklist:DEF_CHK,equip_others:""}).select().single();if(data)S.patients.push(p2l(data,{}));}
+    }
+    noloader();S.syncSt="ok";render();toast(`Synced ${rows.length} patients ✓`,"#16a34a");
+  }catch(e){noloader();S.syncSt="error";renderHdr();toast("Sync failed. Check the URL.","#dc2626");}
+}
+function parseCSV(text){
+  const lines=text.trim().split("\n").filter(Boolean);if(lines.length<2)return[];
+  const hd=lines[0].split(",").map(h=>h.trim().toLowerCase().replace(/[^a-z]/g,""));
+  return lines.slice(1).map((line,i)=>{
+    const cols=line.split(",").map(c=>c.trim().replace(/^"|"$/g,""));
+    const row={};hd.forEach((h,idx)=>{row[h]=cols[idx]??""});
+    const cls=(row.classification||"").toUpperCase();
+    const vW=WARDS.map(w=>w.id);const rW=row.ward?row.ward.trim():"";
+    const ward=vW.find(w=>w.toLowerCase()===rW.toLowerCase())||"Ward A";
+    return{id:row.mrn||`csv-${i}`,room:row.room||"",name:row.name||"",mrn:row.mrn||"",
+      primaryPt:row.primarypt||row.therapist||"",primaryOt:row.primaryot||"",primarySlp:row.primaryslp||"",
+      classification:["ABM","LC","LTC","SSR","PAR"].includes(cls)?cls:"ABM",
+      highPriority:row.highpriority?.toLowerCase()==="true"||row.highpriority==="1",
+      isUrgent:row.isurgent?.toLowerCase()==="true"||row.isurgent==="1",ward};
+  }).filter(r=>r.name);
+}
+</script>
+</body>
+</html>
