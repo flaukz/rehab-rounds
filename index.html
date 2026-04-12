@@ -604,9 +604,10 @@ function openAccountSettings(){
       <div class="settings-section">
         <div class="settings-section-hdr">🔒 Change Password</div>
         <div class="settings-section-body">
+          <div><label class="fl">Current Password</label><input class="fi" id="as-pw0" type="password" placeholder="Your current password"/></div>
           <div><label class="fl">New Password</label><input class="fi" id="as-pw1" type="password" placeholder="Min 6 characters"/></div>
           <div><label class="fl">Confirm New Password</label><input class="fi" id="as-pw2" type="password" placeholder="Repeat new password"/></div>
-          <div id="as-pw-msg" class="settings-err" style="display:none"></div>
+          <div id="as-pw-msg" style="display:none;font-size:12px;font-weight:600;padding:2px 0"></div>
           <button class="btn-primary" style="align-self:flex-end;flex:none;padding:8px 20px" onclick="savePassword()">Change Password</button>
         </div>
       </div>
@@ -648,19 +649,32 @@ async function saveEmail(){
 }
 
 async function savePassword(){
+  const pw0=document.getElementById("as-pw0").value;
   const pw1=document.getElementById("as-pw1").value;
   const pw2=document.getElementById("as-pw2").value;
   const msg=document.getElementById("as-pw-msg");
-  msg.style.display="none";msg.className="settings-err";
-  if(!pw1||!pw2){msg.textContent="Please fill in both fields.";msg.style.display="block";return;}
-  if(pw1.length<6){msg.textContent="Password must be at least 6 characters.";msg.style.display="block";return;}
-  if(pw1!==pw2){msg.textContent="Passwords do not match.";msg.style.display="block";return;}
+  const show=(text,ok)=>{msg.textContent=text;msg.style.color=ok?"#16a34a":"#dc2626";msg.style.display="block";};
+  msg.style.display="none";
+  if(!pw0){show("Please enter your current password.",false);return;}
+  if(!pw1||!pw2){show("Please fill in the new password fields.",false);return;}
+  if(pw1.length<6){show("New password must be at least 6 characters.",false);return;}
+  if(pw1!==pw2){show("New passwords do not match.",false);return;}
+  if(pw0===pw1){show("New password must be different from your current password.",false);return;}
+  // Re-authenticate with current password first
+  const {error:reAuthErr}=await db.auth.signInWithPassword({email:currentUser.email,password:pw0});
+  if(reAuthErr){show("❌ Current password is incorrect.",false);return;}
+  // Now update to new password
   const {error}=await db.auth.updateUser({password:pw1});
-  if(error){msg.textContent="❌ "+error.message;msg.style.display="block";}
-  else{msg.textContent="✅ Password changed!";msg.className="settings-success";msg.style.display="block";
-    document.getElementById("as-pw1").value="";document.getElementById("as-pw2").value="";
+  if(error){show("❌ "+error.message,false);}
+  else{
+    show("✅ Password changed successfully!",true);
+    document.getElementById("as-pw0").value="";
+    document.getElementById("as-pw1").value="";
+    document.getElementById("as-pw2").value="";
     await trackAction("Changed password");
-    setTimeout(()=>msg.style.display="none",3000);}
+    setTimeout(()=>{msg.style.display="none";},4000);
+  }
+}
 }
 
 // ═══════════════════════════════════════
