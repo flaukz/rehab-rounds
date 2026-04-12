@@ -306,7 +306,8 @@ input,select,textarea{font-family:var(--font);}
 .reset-err{font-size:12px;font-weight:600;text-align:center;margin-top:8px;min-height:16px;}
 #toast{position:fixed;top:20px;right:24px;z-index:2000;border-radius:12px;padding:12px 20px;font-size:13px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,0.18);color:#fff;display:none;max-width:360px;}
 .badge{background:#fbbf24;color:#2d1417;border-radius:20px;padding:0 6px;font-size:10px;font-weight:700;}
-#loader{position:fixed;inset:0;background:rgba(45,20,23,0.35);z-index:8000;display:none;align-items:center;justify-content:center;}
+#loader{position:fixed;inset:0;background:rgba(45,20,23,0.35);z-index:8000;display:none;align-items:center;justify-content:center;pointer-events:none;}
+#loader.active{display:flex;pointer-events:all;}
 .loader-box{background:#fff;border-radius:14px;padding:24px 32px;font-size:14px;color:var(--deep);font-weight:600;display:flex;align-items:center;gap:12px;}
 .spin{width:20px;height:20px;border:3px solid #f5d5d8;border-top-color:#9b2335;border-radius:50%;animation:spin 0.7s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
@@ -464,8 +465,8 @@ const wkey=w=>w.toLowerCase().replace(/\s+/g,"");
 const wbc=w=>`wbadge wbadge-${wkey(w||"Ward A")}`;
 let _tt;
 function toast(msg,color="#9b2335"){const e=document.getElementById("toast");e.textContent=msg;e.style.background=color;e.style.display="block";clearTimeout(_tt);_tt=setTimeout(()=>e.style.display="none",3500);}
-function loader(msg){document.getElementById("loader-msg").textContent=msg||"Loading…";document.getElementById("loader").style.display="flex";}
-function noloader(){document.getElementById("loader").style.display="none";}
+function loader(msg){document.getElementById("loader-msg").textContent=msg||"Loading…";document.getElementById("loader").classList.add("active");}
+function noloader(){document.getElementById("loader").classList.remove("active");}
 function getSel(){return S.patients.find(p=>p.id===S.selected);}
 function updL(id,ch){S.patients=S.patients.map(p=>p.id===id?{...p,...ch}:p);}
 
@@ -585,31 +586,31 @@ async function doLogout(){
   await db.auth.signOut();location.reload();
 }
 
-// ── Handle Supabase auth redirects (password recovery etc.) ──
-db.auth.onAuthStateChange(async(event,session)=>{
-  if(event==="PASSWORD_RECOVERY"){
-    document.getElementById("reset-screen").style.display="flex";
-    document.getElementById("auth-screen").style.display="none";
-    document.getElementById("app").style.display="none";
-  }
-});
+// ── Handle password recovery redirect only ──
+let _recoveryMode = false;
 
 document.addEventListener("DOMContentLoaded",async()=>{
   // Check for PKCE recovery code in URL (?code=...)
   const search=window.location.search||"";
-  if(search.includes("code=")){
-    const code=new URLSearchParams(search).get("code");
-    if(code){
-      const {data,error}=await db.auth.exchangeCodeForSession(code);
-      window.history.replaceState({},"",window.location.pathname);
-      if(!error&&data?.session){
-        document.getElementById("reset-screen").style.display="flex";
-        document.getElementById("auth-screen").style.display="none";
-        return;
-      }
+  const hash=window.location.hash||"";
+
+  const hasCode=search.includes("code=");
+  const hasRecovery=hash.includes("type=recovery")||search.includes("type=recovery");
+
+  if(hasCode||hasRecovery){
+    _recoveryMode=true;
+    document.getElementById("reset-screen").style.display="flex";
+    document.getElementById("auth-screen").style.display="none";
+
+    if(hasCode){
+      const code=new URLSearchParams(search).get("code");
+      if(code) await db.auth.exchangeCodeForSession(code);
     }
+    window.history.replaceState({},"",window.location.pathname);
+    return;
   }
-  // Normal session restore
+
+  // Normal: restore existing session
   const {data}=await db.auth.getSession();
   if(data?.session?.user) await bootApp(data.session.user);
 });
