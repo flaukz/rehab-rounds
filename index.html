@@ -427,7 +427,8 @@ input,select,textarea{font-family:var(--font);}
 const {createClient}=supabase;
 const db=createClient(
   "https://rlysdurcxsdtpdohewjo.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJseXNkdXJjeHNkdHBkb2hld2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MTI5MzksImV4cCI6MjA5MTQ4ODkzOX0.0jy9hBiYbP0yVdvly6XTjrrzzb19SjysYMbwVFov1zQ"
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJseXNkdXJjeHNkdHBkb2hld2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MTI5MzksImV4cCI6MjA5MTQ4ODkzOX0.0jy9hBiYbP0yVdvly6XTjrrzzb19SjysYMbwVFov1zQ",
+  {auth:{autoRefreshToken:true,persistSession:true,detectSessionInUrl:true}}
 );
 
 // ═══════════════════════════════════════
@@ -473,7 +474,9 @@ function updL(id,ch){S.patients=S.patients.map(p=>p.id===id?{...p,...ch}:p);}
 // ═══════════════════════════════════════
 function toggleAvMenu(){document.getElementById("av-menu").classList.toggle("open");}
 function closeAvMenu(){document.getElementById("av-menu").classList.remove("open");}
-document.addEventListener("click",e=>{if(!e.target.closest(".hdr-av-wrap"))closeAvMenu();});
+document.addEventListener("DOMContentLoaded",()=>{
+  document.addEventListener("click",e=>{if(!e.target.closest(".hdr-av-wrap"))closeAvMenu();});
+});
 
 // ═══════════════════════════════════════
 //  AUTH
@@ -519,10 +522,26 @@ async function doLogin(){
   errEl.textContent="";
   if(!email||!pass){errEl.textContent="Please enter email and password.";return;}
   btn.disabled=true;btn.textContent="Signing in…";
-  const {data,error}=await db.auth.signInWithPassword({email,password:pass});
-  btn.disabled=false;btn.textContent="Sign In";
-  if(error){errEl.textContent=error.message;return;}
-  await bootApp(data.user);
+  try{
+    const {data,error}=await db.auth.signInWithPassword({email,password:pass});
+    btn.disabled=false;btn.textContent="Sign In";
+    if(error){
+      // Show specific helpful messages
+      if(error.message.includes("Email not confirmed")){
+        errEl.textContent="❌ Email not confirmed. Ask your admin to confirm your account, or disable email confirmation in Supabase.";
+      } else if(error.message.includes("Invalid login")||error.message.includes("invalid_credentials")){
+        errEl.textContent="❌ Incorrect email or password. Please try again.";
+      } else {
+        errEl.textContent="❌ "+error.message;
+      }
+      return;
+    }
+    if(!data?.user){errEl.textContent="❌ Sign in failed. Please try again.";return;}
+    await bootApp(data.user);
+  }catch(e){
+    btn.disabled=false;btn.textContent="Sign In";
+    errEl.textContent="❌ Connection error: "+e.message;
+  }
 }
 
 async function doRegister(){
@@ -566,69 +585,53 @@ async function doLogout(){
   await db.auth.signOut();location.reload();
 }
 
-(async()=>{
-  // Detect ALL Supabase recovery token formats
-  const hash   = window.location.hash   || "";
-  const search = window.location.search || "";
-  const isRecovery =
-    hash.includes("type=recovery") ||
-    search.includes("type=recovery") ||
-    hash.includes("access_token") ||
-    search.includes("code=");           // PKCE flow uses ?code=
-
-  if(isRecovery){
-    // Show reset screen right away before anything else
+// ── Handle Supabase auth redirects (password recovery etc.) ──
+db.auth.onAuthStateChange(async(event,session)=>{
+  if(event==="PASSWORD_RECOVERY"){
     document.getElementById("reset-screen").style.display="flex";
     document.getElementById("auth-screen").style.display="none";
+    document.getElementById("app").style.display="none";
+  }
+});
 
-    // Let Supabase parse the URL tokens and establish a session
-    db.auth.onAuthStateChange(async(event,session)=>{
-      if(event==="PASSWORD_RECOVERY"||event==="SIGNED_IN"){
-        // Keep reset screen visible — user must set new password
+document.addEventListener("DOMContentLoaded",async()=>{
+  // Check for PKCE recovery code in URL (?code=...)
+  const search=window.location.search||"";
+  if(search.includes("code=")){
+    const code=new URLSearchParams(search).get("code");
+    if(code){
+      const {data,error}=await db.auth.exchangeCodeForSession(code);
+      window.history.replaceState({},"",window.location.pathname);
+      if(!error&&data?.session){
         document.getElementById("reset-screen").style.display="flex";
         document.getElementById("auth-screen").style.display="none";
-        document.getElementById("app").style.display="none";
-      }
-    });
-
-    // Also try exchangeCodeForSession for PKCE ?code= links
-    if(search.includes("code=")){
-      const code=new URLSearchParams(search).get("code");
-      if(code){
-        await db.auth.exchangeCodeForSession(code);
-        document.getElementById("reset-screen").style.display="flex";
-        document.getElementById("auth-screen").style.display="none";
+        return;
       }
     }
-    return;
   }
-
   // Normal session restore
   const {data}=await db.auth.getSession();
   if(data?.session?.user) await bootApp(data.session.user);
-})();
+});
 
 async function doResetPassword(){
   const pw1=document.getElementById("rp-pw1").value;
   const pw2=document.getElementById("rp-pw2").value;
   const msg=document.getElementById("rp-msg");
   const btn=document.getElementById("rp-btn");
-  const show=(text,ok)=>{msg.textContent=text;msg.style.color=ok?"#16a34a":"#dc2626";};
   msg.textContent="";
-  if(!pw1||!pw2){show("Please fill in both fields.",false);return;}
-  if(pw1.length<6){show("Password must be at least 6 characters.",false);return;}
-  if(pw1!==pw2){show("Passwords do not match.",false);return;}
+  if(!pw1||!pw2){msg.textContent="Please fill in both fields.";msg.style.color="#dc2626";return;}
+  if(pw1.length<6){msg.textContent="Password must be at least 6 characters.";msg.style.color="#dc2626";return;}
+  if(pw1!==pw2){msg.textContent="Passwords do not match.";msg.style.color="#dc2626";return;}
   btn.disabled=true;btn.textContent="Saving…";
   const {error}=await db.auth.updateUser({password:pw1});
   btn.disabled=false;btn.textContent="Set New Password";
-  if(error){show("❌ "+error.message,false);}
+  if(error){msg.textContent="❌ "+error.message;msg.style.color="#dc2626";}
   else{
-    show("✅ Password set! Redirecting to sign in…",true);
+    msg.textContent="✅ Password updated! Redirecting to sign in…";
+    msg.style.color="#16a34a";
     await db.auth.signOut();
-    setTimeout(()=>{
-      window.location.hash="";
-      window.location.reload();
-    },2000);
+    setTimeout(()=>{window.location.href=window.location.pathname;},2000);
   }
 }
 
