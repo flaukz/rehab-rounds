@@ -298,7 +298,12 @@ input,select,textarea{font-family:var(--font);}
 .ua-btn.demote:hover{background:#fee2e2;}
 .last-seen{font-size:11px;color:var(--fa);}
 
-/* MISC */
+/* RESET PASSWORD SCREEN */
+#reset-screen{position:fixed;inset:0;background:linear-gradient(135deg,#7b1f2e 0%,#9b2335 50%,#b83245 100%);display:none;align-items:center;justify-content:center;z-index:9999;}
+.reset-box{background:#fff;border-radius:20px;padding:36px 32px;width:min(400px,94vw);box-shadow:0 24px 64px rgba(0,0,0,0.22);}
+.reset-box h2{font-family:var(--disp);font-size:20px;color:var(--deep);margin-bottom:6px;text-align:center;}
+.reset-box p{font-size:12px;color:var(--mu);text-align:center;margin-bottom:22px;}
+.reset-err{font-size:12px;font-weight:600;text-align:center;margin-top:8px;min-height:16px;}
 #toast{position:fixed;top:20px;right:24px;z-index:2000;border-radius:12px;padding:12px 20px;font-size:13px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,0.18);color:#fff;display:none;max-width:360px;}
 .badge{background:#fbbf24;color:#2d1417;border-radius:20px;padding:0 6px;font-size:10px;font-weight:700;}
 #loader{position:fixed;inset:0;background:rgba(45,20,23,0.35);z-index:8000;display:none;align-items:center;justify-content:center;}
@@ -309,6 +314,21 @@ input,select,textarea{font-family:var(--font);}
 </style>
 </head>
 <body>
+
+<!-- RESET PASSWORD SCREEN -->
+<div id="reset-screen">
+  <div class="reset-box">
+    <div class="auth-logo">
+      <div class="icon">🔒</div>
+      <h2>Set New Password</h2>
+      <p>Enter and confirm your new password below.</p>
+    </div>
+    <div class="af"><label>New Password</label><input type="password" id="rp-pw1" class="fi" style="width:100%;padding:10px 13px;border-radius:9px" placeholder="Min 6 characters"/></div>
+    <div class="af" style="margin-top:12px"><label>Confirm New Password</label><input type="password" id="rp-pw2" class="fi" style="width:100%;padding:10px 13px;border-radius:9px" placeholder="Repeat new password" onkeydown="if(event.key==='Enter')doResetPassword()"/></div>
+    <button class="auth-btn" id="rp-btn" onclick="doResetPassword()" style="margin-top:8px">Set New Password</button>
+    <div class="reset-err" id="rp-msg"></div>
+  </div>
+</div>
 
 <!-- AUTH -->
 <div id="auth-screen">
@@ -496,7 +516,71 @@ async function doLogout(){
   await db.auth.signOut();location.reload();
 }
 
-(async()=>{const {data}=await db.auth.getSession();if(data?.session?.user)await bootApp(data.session.user);})();
+(async()=>{
+  // Detect ALL Supabase recovery token formats
+  const hash   = window.location.hash   || "";
+  const search = window.location.search || "";
+  const isRecovery =
+    hash.includes("type=recovery") ||
+    search.includes("type=recovery") ||
+    hash.includes("access_token") ||
+    search.includes("code=");           // PKCE flow uses ?code=
+
+  if(isRecovery){
+    // Show reset screen right away before anything else
+    document.getElementById("reset-screen").style.display="flex";
+    document.getElementById("auth-screen").style.display="none";
+
+    // Let Supabase parse the URL tokens and establish a session
+    db.auth.onAuthStateChange(async(event,session)=>{
+      if(event==="PASSWORD_RECOVERY"||event==="SIGNED_IN"){
+        // Keep reset screen visible — user must set new password
+        document.getElementById("reset-screen").style.display="flex";
+        document.getElementById("auth-screen").style.display="none";
+        document.getElementById("app").style.display="none";
+      }
+    });
+
+    // Also try exchangeCodeForSession for PKCE ?code= links
+    if(search.includes("code=")){
+      const code=new URLSearchParams(search).get("code");
+      if(code){
+        await db.auth.exchangeCodeForSession(code);
+        document.getElementById("reset-screen").style.display="flex";
+        document.getElementById("auth-screen").style.display="none";
+      }
+    }
+    return;
+  }
+
+  // Normal session restore
+  const {data}=await db.auth.getSession();
+  if(data?.session?.user) await bootApp(data.session.user);
+})();
+
+async function doResetPassword(){
+  const pw1=document.getElementById("rp-pw1").value;
+  const pw2=document.getElementById("rp-pw2").value;
+  const msg=document.getElementById("rp-msg");
+  const btn=document.getElementById("rp-btn");
+  const show=(text,ok)=>{msg.textContent=text;msg.style.color=ok?"#16a34a":"#dc2626";};
+  msg.textContent="";
+  if(!pw1||!pw2){show("Please fill in both fields.",false);return;}
+  if(pw1.length<6){show("Password must be at least 6 characters.",false);return;}
+  if(pw1!==pw2){show("Passwords do not match.",false);return;}
+  btn.disabled=true;btn.textContent="Saving…";
+  const {error}=await db.auth.updateUser({password:pw1});
+  btn.disabled=false;btn.textContent="Set New Password";
+  if(error){show("❌ "+error.message,false);}
+  else{
+    show("✅ Password set! Redirecting to sign in…",true);
+    await db.auth.signOut();
+    setTimeout(()=>{
+      window.location.hash="";
+      window.location.reload();
+    },2000);
+  }
+}
 
 // ═══════════════════════════════════════
 //  BOOT
@@ -660,10 +744,18 @@ async function savePassword(){
   if(pw1.length<6){show("New password must be at least 6 characters.",false);return;}
   if(pw1!==pw2){show("New passwords do not match.",false);return;}
   if(pw0===pw1){show("New password must be different from your current password.",false);return;}
-  // Re-authenticate with current password first
-  const {error:reAuthErr}=await db.auth.signInWithPassword({email:currentUser.email,password:pw0});
-  if(reAuthErr){show("❌ Current password is incorrect.",false);return;}
-  // Now update to new password
+
+  // Verify current password by attempting sign-in on a SEPARATE client instance
+  // so we don't disturb the current session
+  const testClient=createClient(
+    "https://rlysdurcxsdtpdohewjo.supabase.co",
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJseXNkdXJjeHNkdHBkb2hld2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MTI5MzksImV4cCI6MjA5MTQ4ODkzOX0.0jy9hBiYbP0yVdvly6XTjrrzzb19SjysYMbwVFov1zQ",
+    {auth:{persistSession:false,autoRefreshToken:false}}
+  );
+  const {error:verifyErr}=await testClient.auth.signInWithPassword({email:currentUser.email,password:pw0});
+  if(verifyErr){show("❌ Current password is incorrect.",false);return;}
+
+  // Now update password using the MAIN session (which is still intact)
   const {error}=await db.auth.updateUser({password:pw1});
   if(error){show("❌ "+error.message,false);}
   else{
