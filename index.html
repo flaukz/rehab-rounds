@@ -347,6 +347,20 @@ input,select,textarea{font-family:var(--font);}
       <div class="af"><label>Password</label><input type="password" id="l-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"/></div>
       <button class="auth-btn" id="login-btn" onclick="doLogin()">Sign In</button>
       <div class="auth-err" id="login-err"></div>
+      <div style="text-align:center;margin-top:12px">
+        <button onclick="showForgotPassword()" style="background:none;border:none;font-size:12px;color:var(--mu);text-decoration:underline;cursor:pointer">Forgot your password?</button>
+      </div>
+    </div>
+    <!-- FORGOT PASSWORD PANEL -->
+    <div id="panel-forgot" style="display:none">
+      <div style="font-size:13px;color:var(--mu);margin-bottom:14px;text-align:center">Enter your email and we'll send a reset link.</div>
+      <div class="af"><label>Email</label><input type="email" id="fp-email" placeholder="your@email.com"/></div>
+      <button class="auth-btn" id="fp-btn" onclick="doForgotPassword()">Send Reset Link</button>
+      <div class="auth-err" id="fp-err"></div>
+      <div class="auth-ok" id="fp-ok"></div>
+      <div style="text-align:center;margin-top:12px">
+        <button onclick="switchTab('login')" style="background:none;border:none;font-size:12px;color:var(--mu);text-decoration:underline;cursor:pointer">← Back to Sign In</button>
+      </div>
     </div>
     <div id="panel-register" style="display:none">
       <div class="af"><label>Full Name</label><input type="text" id="r-name" placeholder="e.g. Dr. Juan dela Cruz"/></div>
@@ -466,12 +480,35 @@ document.addEventListener("click",e=>{if(!e.target.closest(".hdr-av-wrap"))close
 // ═══════════════════════════════════════
 function switchTab(tab){
   document.getElementById("panel-login").style.display=tab==="login"?"block":"none";
+  document.getElementById("panel-forgot").style.display="none";
   document.getElementById("panel-register").style.display=tab==="register"?"block":"none";
   document.getElementById("tab-login").className="auth-tab"+(tab==="login"?" active":"");
   document.getElementById("tab-register").className="auth-tab"+(tab==="register"?" active":"");
   document.getElementById("login-err").textContent="";
   document.getElementById("register-err").textContent="";
   document.getElementById("register-ok").textContent="";
+}
+function showForgotPassword(){
+  document.getElementById("panel-login").style.display="none";
+  document.getElementById("panel-forgot").style.display="block";
+  document.getElementById("panel-register").style.display="none";
+  document.getElementById("fp-err").textContent="";
+  document.getElementById("fp-ok").textContent="";
+}
+async function doForgotPassword(){
+  const email=document.getElementById("fp-email").value.trim();
+  const errEl=document.getElementById("fp-err");
+  const okEl=document.getElementById("fp-ok");
+  const btn=document.getElementById("fp-btn");
+  errEl.textContent="";okEl.textContent="";
+  if(!email){errEl.textContent="Please enter your email.";return;}
+  btn.disabled=true;btn.textContent="Sending…";
+  const {error}=await db.auth.resetPasswordForEmail(email,{
+    redirectTo:"https://salma-pmr.vercel.app"
+  });
+  btn.disabled=false;btn.textContent="Send Reset Link";
+  if(error){errEl.textContent="❌ "+error.message;}
+  else{okEl.textContent="✅ Reset link sent! Check your inbox and spam folder.";}
 }
 
 async function doLogin(){
@@ -501,13 +538,26 @@ async function doRegister(){
   if(pass.length<6){errEl.textContent="Password must be at least 6 characters.";return;}
   if(pass!==pass2){errEl.textContent="Passwords do not match.";return;}
   btn.disabled=true;btn.textContent="Creating account…";
-  const {data,error}=await db.auth.signUp({email,password:pass,options:{data:{full_name:name}}});
+  const {data,error}=await db.auth.signUp({
+    email,password:pass,
+    options:{data:{full_name:name},emailRedirectTo:"https://salma-pmr.vercel.app"}
+  });
   btn.disabled=false;btn.textContent="Create Account";
-  if(error){errEl.textContent=error.message;return;}
+  if(error){errEl.textContent="❌ "+error.message;return;}
   if(data.user){
-    await db.from("user_roles").upsert({user_id:data.user.id,role:"user",full_name:name,last_active:new Date().toISOString()},{onConflict:"user_id"});
-    okEl.textContent="✅ Account created! You can now sign in.";
-    setTimeout(()=>switchTab("login"),2200);
+    await db.from("user_roles").upsert({
+      user_id:data.user.id,role:"user",full_name:name,
+      last_active:new Date().toISOString()
+    },{onConflict:"user_id"});
+  }
+  if(data.session){
+    // Email confirmation OFF — sign in immediately
+    okEl.textContent="✅ Account created! Signing you in…";
+    setTimeout(()=>bootApp(data.user),1200);
+  } else {
+    // Email confirmation ON
+    okEl.textContent="✅ Account created! Check your email to confirm, then sign in here.";
+    setTimeout(()=>switchTab("login"),3500);
   }
 }
 
