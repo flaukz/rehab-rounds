@@ -265,7 +265,8 @@ input,select,textarea{font-family:var(--font);}
 /* MISC */
 #toast{position:fixed;top:20px;right:24px;z-index:2000;border-radius:12px;padding:12px 20px;font-size:13px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,0.18);color:#fff;display:none;max-width:340px;}
 .badge{background:#fbbf24;color:#2d1417;border-radius:20px;padding:0 6px;font-size:10px;font-weight:700;}
-#loader{position:fixed;inset:0;background:rgba(45,20,23,0.35);z-index:8000;display:none;align-items:center;justify-content:center;}
+#loader{position:fixed;inset:0;background:rgba(45,20,23,0.35);z-index:8000;display:none;align-items:center;justify-content:center;pointer-events:none;}
+#loader.visible{display:flex;pointer-events:all;}
 .loader-box{background:#fff;border-radius:14px;padding:24px 32px;font-size:14px;color:var(--deep);font-weight:600;display:flex;align-items:center;gap:12px;}
 .spin{width:20px;height:20px;border:3px solid #f5d5d8;border-top-color:#9b2335;border-radius:50%;animation:spin 0.7s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
@@ -379,8 +380,8 @@ const wkey=w=>w.toLowerCase().replace(/\s+/g,"");
 const wbc=w=>`wbadge wbadge-${wkey(w||"Ward A")}`;
 let _tt;
 function toast(msg,color="#9b2335"){const e=document.getElementById("toast");e.textContent=msg;e.style.background=color;e.style.display="block";clearTimeout(_tt);_tt=setTimeout(()=>e.style.display="none",3500);}
-function loader(msg){document.getElementById("loader-msg").textContent=msg||"Loading…";document.getElementById("loader").style.display="flex";}
-function noloader(){document.getElementById("loader").style.display="none";}
+function loader(msg){document.getElementById("loader-msg").textContent=msg||"Loading…";document.getElementById("loader").classList.add("visible");}
+function noloader(){document.getElementById("loader").classList.remove("visible");}
 function getSel(){return S.patients.find(p=>p.id===S.selected);}
 
 // ═══════════════════════════════════════
@@ -394,6 +395,10 @@ function switchAuthTab(tab){
   document.getElementById("login-err").textContent="";
   document.getElementById("register-err").textContent="";
   document.getElementById("register-ok").textContent="";
+  // Clear register fields when switching to sign-in to avoid confusion
+  if(tab==="signin"){
+    ["rn","re","rp","rp2"].forEach(id=>{const el=document.getElementById(id);if(el)el.value="";});
+  }
 }
 
 async function doLogin(){
@@ -404,10 +409,15 @@ async function doLogin(){
   err.textContent="";
   if(!email||!pass){err.textContent="Please enter email and password.";return;}
   btn.disabled=true;btn.textContent="Signing in…";
-  const {data,error}=await db.auth.signInWithPassword({email,password:pass});
-  btn.disabled=false;btn.textContent="Sign In";
-  if(error){err.textContent=error.message;return;}
-  await onLogin(data.user);
+  try{
+    const {data,error}=await db.auth.signInWithPassword({email,password:pass});
+    btn.disabled=false;btn.textContent="Sign In";
+    if(error){err.textContent=error.message;return;}
+    await onLogin(data.user);
+  }catch(e){
+    btn.disabled=false;btn.textContent="Sign In";
+    err.textContent="Unexpected error: "+e.message;
+  }
 }
 
 async function doRegister(){
@@ -420,23 +430,29 @@ async function doRegister(){
   const btn=document.getElementById("register-btn");
   err.textContent="";ok.textContent="";
   if(!name||!email||!pass||!pass2){err.textContent="Please fill in all fields.";return;}
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){err.textContent="Please enter a valid email address.";return;}
   if(pass.length<6){err.textContent="Password must be at least 6 characters.";return;}
   if(pass!==pass2){err.textContent="Passwords do not match.";return;}
   btn.disabled=true;btn.textContent="Creating account…";
-  const {data,error}=await db.auth.signUp({
-    email,password:pass,
-    options:{data:{full_name:name}}
-  });
-  btn.disabled=false;btn.textContent="Create Account";
-  if(error){err.textContent=error.message;return;}
-  // If email confirmation is OFF — session exists, log in immediately
-  if(data.session){
-    ok.textContent="✅ Account created! Signing you in…";
-    setTimeout(()=>onLogin(data.user),1200);
-  } else {
-    // Email confirmation is ON — tell user to check email
-    ok.textContent="✅ Account created! Check your email to confirm, then sign in.";
-    setTimeout(()=>switchAuthTab("signin"),3000);
+  try{
+    const {data,error}=await db.auth.signUp({
+      email,password:pass,
+      options:{data:{full_name:name}}
+    });
+    btn.disabled=false;btn.textContent="Create Account";
+    if(error){err.textContent=error.message;return;}
+    if(!data?.user){err.textContent="Something went wrong. Please try again.";return;}
+    ["rn","re","rp","rp2"].forEach(id=>{const el=document.getElementById(id);if(el)el.value="";});
+    if(data.session){
+      ok.textContent="✅ Account created! Signing you in…";
+      setTimeout(()=>onLogin(data.user),1200);
+    }else{
+      ok.textContent="✅ Account created! Check your email to confirm, then sign in.";
+      setTimeout(()=>switchAuthTab("signin"),3000);
+    }
+  }catch(e){
+    btn.disabled=false;btn.textContent="Create Account";
+    err.textContent="Unexpected error: "+e.message;
   }
 }
 async function onLogin(user){
@@ -457,7 +473,14 @@ async function doLogout(){
   if(!confirm("Sign out?"))return;
   await db.auth.signOut();location.reload();
 }
-(async()=>{const {data}=await db.auth.getSession();if(data?.session?.user)await onLogin(data.session.user);})();
+(async()=>{
+  try{
+    const {data}=await db.auth.getSession();
+    if(data?.session?.user)await onLogin(data.session.user);
+  }catch(e){
+    console.error("Session restore error:",e);
+  }
+})();
 
 // ═══════════════════════════════════════
 //  DB LOAD
@@ -478,7 +501,11 @@ async function loadAll(){
     if(p.is_archived)S.archive.push({...lp,archivedAt:p.archived_at});
     else S.patients.push(lp);
   });
-  if(!S.selected&&S.patients.length)S.selected=S.patients[0].id;
+  // Reset selected if it no longer exists in the active list
+  const ids=S.patients.map(p=>p.id);
+  if(!S.selected||!ids.includes(S.selected)){
+    S.selected=S.patients.length?S.patients[0].id:null;
+  }
 }
 const p2l=(p,nm)=>({
   id:p.id,room:p.room,name:p.name,mrn:p.mrn,
@@ -734,13 +761,24 @@ async function saveNote(pid,draftF,histF){
   noloader();if(error){toast("Failed to save note.","#dc2626");return;}
   const saved=n2l(nd,[]);
   const changes={[histF]:[...(p[histF]||[]),saved],[draftF]:""};
+  let flagRemoved=false;
   const tracked=["physicianHistory","roundHistory","ptHistory","otHistory","slpHistory"];
   if(tracked.includes(histF)){
-    if(p.highPriority){changes.highPriority=false;await db.from("patients").update({high_priority:false,updated_at:new Date().toISOString()}).eq("id",pid);toast(`Priority flag removed — note saved.`,"#9b2335");}
-    if(p.isUrgent){changes.isUrgent=false;await db.from("patients").update({is_urgent:false,updated_at:new Date().toISOString()}).eq("id",pid);toast(`Urgent flag removed — note saved.`,"#dc2626");}
+    if(p.highPriority){
+      changes.highPriority=false;
+      await db.from("patients").update({high_priority:false,updated_at:new Date().toISOString()}).eq("id",pid);
+      flagRemoved=true;
+      toast(`🚩 Priority flag removed — note saved for ${p.name}.`,"#9b2335");
+    }
+    if(p.isUrgent){
+      changes.isUrgent=false;
+      await db.from("patients").update({is_urgent:false,updated_at:new Date().toISOString()}).eq("id",pid);
+      flagRemoved=true;
+      toast(`🔴 Urgent flag removed — note saved for ${p.name}.`,"#dc2626");
+    }
   }
   updL(pid,changes);renderMain();renderSidebar();
-  if(!changes.highPriority&&!changes.isUrgent)toast("Note saved ✓","#16a34a");
+  if(!flagRemoved)toast("Note saved ✓","#16a34a");
 }
 
 // note view/edit/delete
@@ -768,8 +806,9 @@ async function commitEdit(pid,hk,nid){
   const ta=document.getElementById("eta-"+nid);if(!ta)return;
   const t=ta.value.trim();if(!t){toast("Note cannot be empty.","#dc2626");return;}
   loader("Updating note…");
-  await db.from("notes").update({text:t,edited_at:new Date().toISOString()}).eq("id",nid);
+  const {error}=await db.from("notes").update({text:t,edited_at:new Date().toISOString()}).eq("id",nid);
   noloader();
+  if(error){toast("Failed to update note: "+error.message,"#dc2626");return;}
   const p=S.patients.find(x=>x.id===pid);if(!p)return;
   updL(pid,{[hk]:(p[hk]||[]).map(n=>n.id===nid?{...n,text:t,editedAt:new Date().toISOString()}:n)});
   renderMain();toast("Note updated ✓","#16a34a");
@@ -879,11 +918,13 @@ async function subPat(eid){
   const cls=document.getElementById("fc").value,ward=document.getElementById("fw").value;
   const hp=document.getElementById("fp").value==="1",isUrgent=document.getElementById("fu").value==="1";
   if(!room||!mrn||!name){toast("Please fill in Room, MRN and Patient Name.","#dc2626");return;}
-  loader(eid?"Saving…":"Adding…");
-  if(eid!==null){
-    const {error}=await db.from("patients").update({room,mrn,name,primary_pt:primaryPt,primary_ot:primaryOt,primary_slp:primarySlp,classification:cls,high_priority:hp,is_urgent:isUrgent,ward,updated_at:new Date().toISOString()}).eq("id",eid);
+  // eid is passed as a string from onclick — convert "null" string to actual null
+  const editId=(eid===null||eid==="null")?null:eid;
+  loader(editId?"Saving…":"Adding…");
+  if(editId){
+    const {error}=await db.from("patients").update({room,mrn,name,primary_pt:primaryPt,primary_ot:primaryOt,primary_slp:primarySlp,classification:cls,high_priority:hp,is_urgent:isUrgent,ward,updated_at:new Date().toISOString()}).eq("id",editId);
     noloader();if(error){toast("Failed: "+error.message,"#dc2626");return;}
-    updL(eid,{room,mrn,name,primaryPt,primaryOt,primarySlp,classification:cls,highPriority:hp,isUrgent,ward});
+    updL(editId,{room,mrn,name,primaryPt,primaryOt,primarySlp,classification:cls,highPriority:hp,isUrgent,ward});
   }else{
     const {data,error}=await db.from("patients").insert({room,mrn,name,primary_pt:primaryPt,primary_ot:primaryOt,primary_slp:primarySlp,classification:cls,high_priority:hp,is_urgent:isUrgent,ward,checklist:DEF_CHK,equip_others:""}).select().single();
     noloader();if(error){toast("Failed: "+error.message,"#dc2626");return;}
@@ -951,7 +992,7 @@ async function syncNow(){
   if(!S.sheetUrl){toast("No Google Sheet URL configured.","#dc2626");return;}
   S.syncSt="syncing";renderHdr();
   try{
-    const res=await fetch(S.sheetUrl);if(!res.ok)throw new Error();
+    const res=await fetch(S.sheetUrl);if(!res.ok)throw new Error("HTTP "+res.status);
     const rows=parseCSV(await res.text());if(!rows.length)throw new Error("empty");
     loader(`Syncing ${rows.length} patients…`);
     for(const r of rows){
@@ -961,23 +1002,38 @@ async function syncNow(){
       else{const {data}=await db.from("patients").insert({...upd,mrn:r.mrn,checklist:DEF_CHK,equip_others:""}).select().single();if(data)S.patients.push(p2l(data,{}));}
     }
     noloader();S.syncSt="ok";render();toast(`Synced ${rows.length} patients ✓`,"#16a34a");
-  }catch(e){noloader();S.syncSt="error";renderHdr();toast("Sync failed. Check the URL.","#dc2626");}
+  }catch(e){
+    noloader();S.syncSt="error";renderHdr();
+    toast("Sync failed. Check the URL and make sure the sheet is published publicly.","#dc2626");
+  }
 }
 function parseCSV(text){
   const lines=text.trim().split("\n").filter(Boolean);if(lines.length<2)return[];
-  const hd=lines[0].split(",").map(h=>h.trim().toLowerCase().replace(/[^a-z]/g,""));
+  // Properly parse CSV respecting quoted fields
+  const parseLine=line=>{
+    const cols=[];let cur="",inQ=false;
+    for(let i=0;i<line.length;i++){
+      const c=line[i];
+      if(c==='"'){inQ=!inQ;}
+      else if(c===","&&!inQ){cols.push(cur.trim());cur="";}
+      else{cur+=c;}
+    }
+    cols.push(cur.trim());
+    return cols;
+  };
+  const hd=parseLine(lines[0]).map(h=>h.toLowerCase().replace(/[^a-z]/g,""));
   return lines.slice(1).map((line,i)=>{
-    const cols=line.split(",").map(c=>c.trim().replace(/^"|"$/g,""));
-    const row={};hd.forEach((h,idx)=>{row[h]=cols[idx]??""});
+    const cols=parseLine(line);
+    const row={};hd.forEach((h,idx)=>{row[h]=(cols[idx]??"").replace(/^"|"$/g,"");});
     const cls=(row.classification||"").toUpperCase();
-    const vW=WARDS.map(w=>w.id);const rW=row.ward?row.ward.trim():"";
+    const vW=WARDS.map(w=>w.id);const rW=(row.ward||"").trim();
     const ward=vW.find(w=>w.toLowerCase()===rW.toLowerCase())||"Ward A";
     return{id:row.mrn||`csv-${i}`,room:row.room||"",name:row.name||"",mrn:row.mrn||"",
       primaryPt:row.primarypt||row.therapist||"",primaryOt:row.primaryot||"",primarySlp:row.primaryslp||"",
       classification:["ABM","LC","LTC","SSR","PAR"].includes(cls)?cls:"ABM",
       highPriority:row.highpriority?.toLowerCase()==="true"||row.highpriority==="1",
       isUrgent:row.isurgent?.toLowerCase()==="true"||row.isurgent==="1",ward};
-  }).filter(r=>r.name);
+  }).filter(r=>r.name&&r.mrn);
 }
 </script>
 </body>
