@@ -261,9 +261,25 @@ input,select,textarea{font-family:var(--font);}
 .badge{background:#fbbf24;color:#2d1417;border-radius:20px;padding:0 6px;font-size:10px;font-weight:700;}
 #loader{position:fixed;inset:0;background:rgba(45,20,23,0.35);z-index:8000;display:none;align-items:center;justify-content:center;}
 .loader-box{background:#fff;border-radius:14px;padding:24px 32px;font-size:14px;color:var(--deep);font-weight:600;display:flex;align-items:center;gap:12px;}
-.spin{width:20px;height:20px;border:3px solid #f5d5d8;border-top-color:#9b2335;border-radius:50%;animation:spin 0.7s linear infinite;}
-@keyframes spin{to{transform:rotate(360deg);}}
-</style>
+/* USER MANAGEMENT */
+.user-table{width:100%;border-collapse:collapse;}
+.user-table th{font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:0.07em;padding:10px 16px;text-align:left;background:#fdf0f1;border-bottom:1px solid #f5d5d8;}
+.user-table td{padding:12px 16px;font-size:13px;color:var(--td);border-bottom:1px solid #fdf0f1;vertical-align:middle;}
+.user-table tr:last-child td{border-bottom:none;}
+.user-table tr:hover td{background:#fdf8f8;}
+.role-pill{font-size:10px;font-weight:700;border-radius:20px;padding:3px 10px;display:inline-block;}
+.rp-admin{background:#fbbf24;color:#1e1e1e;}
+.rp-admin_officer{background:#a78bfa;color:#1e1e1e;}
+.rp-user{background:#e0eaf5;color:#4b5563;}
+.ua-btn{padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid #edcacf;background:#fdf0f1;color:var(--mid);margin:2px;}
+.ua-btn:hover{background:#f7d5d8;}
+.ua-promote{border-color:#a78bfa;background:#f5f3ff;color:#5b21b6;}
+.ua-promote:hover{background:#ede9fe;}
+.ua-promote-admin{border-color:#f59e0b;background:#fffbeb;color:#92400e;}
+.ua-promote-admin:hover{background:#fef3c7;}
+.ua-demote{border-color:#fecaca;background:#fff5f5;color:#dc2626;}
+.ua-demote:hover{background:#fee2e2;}
+
 </head>
 <body>
 
@@ -293,6 +309,7 @@ input,select,textarea{font-family:var(--font);}
       <button class="hdr-btn" onclick="openSheetModal()">🔗 Google Sheet <span id="sync-ind"></span></button>
       <button class="hdr-btn" id="sync-now-btn" onclick="syncNow()" style="display:none">🔄 Sync Now</button>
       <button class="hdr-btn" onclick="openArchiveModal()">🗄️ Archive <span class="badge" id="arc-count" style="display:none"></span></button>
+      <button class="hdr-btn" id="hdr-admin-btn" onclick="openAdminPanel()" style="display:none">👑 Users</button>
       <span class="hdr-date" id="hdr-date"></span>
       <span class="hdr-user" id="hdr-user"></span>
       <div class="hdr-avatar" id="hdr-av" onclick="doLogout()" title="Click to sign out">?</div>
@@ -341,7 +358,8 @@ const DEF_CHK = {stable:false,unstable:false,bariatricWheelchair:false,comfortWh
 //  STATE
 // ═══════════════════════════════════════
 let S = { patients:[], archive:[], selected:null, search:"", sheetUrl:localStorage.getItem("cr_sheet")||"", syncSt:"idle" };
-let currentUser=null, currentName="";
+let currentUser=null, currentName="", currentRole="user";
+const isAdmin=()=>currentRole==="admin";
 const collapsed = new Set();
 
 // ═══════════════════════════════════════
@@ -376,12 +394,27 @@ async function doLogin(){
 async function onLogin(user){
   currentUser=user;
   currentName=user.user_metadata?.full_name||user.email.split("@")[0];
+
+  // Fetch role from user_roles table
+  const {data:roleRow}=await db.from("user_roles").select("role,full_name").eq("user_id",user.id).maybeSingle();
+  if(roleRow){
+    currentRole=roleRow.role||"user";
+    if(roleRow.full_name)currentName=roleRow.full_name;
+  } else {
+    currentRole="user";
+  }
+
   document.getElementById("login-screen").style.display="none";
   document.getElementById("app").style.display="flex";
   const av=document.getElementById("hdr-av");
   av.textContent=currentName.slice(0,2).toUpperCase();
   av.title=`Signed in as ${user.email} — click to sign out`;
   document.getElementById("hdr-user").textContent=currentName;
+
+  // Show admin button only for admins
+  const adminBtn=document.getElementById("hdr-admin-btn");
+  if(adminBtn)adminBtn.style.display=isAdmin()?"":"none";
+
   loader("Loading patients…");
   await loadAll();
   noloader();
@@ -912,6 +945,71 @@ function parseCSV(text){
       highPriority:row.highpriority?.toLowerCase()==="true"||row.highpriority==="1",
       isUrgent:row.isurgent?.toLowerCase()==="true"||row.isurgent==="1",ward};
   }).filter(r=>r.name);
+// ═══════════════════════════════════════
+//  ADMIN USER MANAGEMENT
+// ═══════════════════════════════════════
+async function openAdminPanel(){
+  if(!isAdmin()){toast("Admin access only.","#dc2626");return;}
+  loader("Loading users…");
+  const {data:users,error}=await db.from("user_roles").select("*").order("created_at");
+  noloader();
+  if(error){toast("Failed to load users: "+error.message,"#dc2626");return;}
+
+  const fmtDate=iso=>{if(!iso)return"—";const d=new Date(iso);return d.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});};
+  const PILLS={"admin":"rp-admin","admin_officer":"rp-admin_officer","user":"rp-user"};
+  const LABELS={"admin":"👑 Admin","admin_officer":"🔷 Admin Officer","user":"👤 User"};
+
+  const rows=(users||[]).map(u=>{
+    const isMe=u.user_id===currentUser?.id;
+    const role=u.role||"user";
+    const pill=`<span class="role-pill ${PILLS[role]||"rp-user"}">${LABELS[role]||role}</span>`;
+    let actions="";
+    if(isMe){
+      actions=`<span style="font-size:11px;color:var(--mu);font-style:italic">You</span>`;
+    } else if(role==="user"){
+      actions=`<button class="ua-btn ua-promote" onclick="changeRole('${u.user_id}','admin_officer')">→ Admin Officer</button>
+               <button class="ua-btn ua-promote-admin" onclick="changeRole('${u.user_id}','admin')">→ Admin</button>`;
+    } else if(role==="admin_officer"){
+      actions=`<button class="ua-btn ua-promote-admin" onclick="changeRole('${u.user_id}','admin')">→ Admin</button>
+               <button class="ua-btn ua-demote" onclick="changeRole('${u.user_id}','user')">→ User</button>`;
+    } else if(role==="admin"){
+      actions=`<button class="ua-btn ua-demote" onclick="changeRole('${u.user_id}','admin_officer')">→ Admin Officer</button>
+               <button class="ua-btn ua-demote" onclick="changeRole('${u.user_id}','user')">→ User</button>`;
+    }
+    return `<tr>
+      <td><strong>${esc(u.full_name||"—")}</strong>${isMe?' <span style="font-size:10px;color:var(--mu)">(you)</span>':""}</td>
+      <td>${pill}</td>
+      <td style="font-size:11px;color:var(--fa)">${fmtDate(u.created_at)}</td>
+      <td><div style="display:flex;flex-wrap:wrap;gap:2px">${actions}</div></td>
+    </tr>`;
+  }).join("");
+
+  showModal(`
+    <div class="modal-head">
+      <span class="modal-title">👑 User Management</span>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div style="padding:10px 20px;background:#fdf0f1;border-bottom:1px solid #f5d5d8;font-size:12px;color:#9b2335;">
+      <strong>${(users||[]).length}</strong> registered user${(users||[]).length!==1?"s":""}. Role changes take effect on the user's next sign-in.
+    </div>
+    <div style="overflow:auto;max-height:60vh;">
+      <table class="user-table">
+        <thead><tr><th>Name</th><th>Role</th><th>Joined</th><th>Actions</th></tr></thead>
+        <tbody>${rows||`<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--fa)">No users found.</td></tr>`}</tbody>
+      </table>
+    </div>
+  `,false,true);
+}
+
+async function changeRole(userId,newRole){
+  if(!isAdmin()){toast("Admin access only.","#dc2626");return;}
+  const LABELS={"admin":"👑 Admin","admin_officer":"🔷 Admin Officer","user":"👤 User"};
+  loader("Updating role…");
+  const {error}=await db.from("user_roles").update({role:newRole}).eq("user_id",userId);
+  noloader();
+  if(error){toast("Failed: "+error.message,"#dc2626");return;}
+  toast(`Role updated to ${LABELS[newRole]} ✓`,"#16a34a");
+  openAdminPanel();
 }
 </script>
 </body>
