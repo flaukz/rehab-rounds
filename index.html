@@ -157,6 +157,8 @@ input,select,textarea{font-family:var(--font);}
 .eq-icon{font-size:16px;}.eq-lbl{font-size:12px;font-weight:600;color:#3d1e22;}
 .eq-btn.checked .eq-lbl{color:#7b1f2e;}
 .eq-chk{font-size:11px;font-weight:700;color:#9b2335;background:#fad5d9;border-radius:20px;padding:1px 7px;margin-left:2px;}
+.eq-other{width:100%;padding:8px 12px;border-radius:8px;border:1.5px solid #edcacf;outline:none;font-size:13px;color:#3d1e22;background:#fdf8f8;font-family:var(--font);}
+.eq-other:focus{border-color:#9b2335;}
 
 /* NOTES */
 .notes-wrap{display:flex;flex-direction:column;gap:14px;}
@@ -629,6 +631,10 @@ function renderMain(){
       ${rEq(p,"standardWheelchair","Standard Wheelchair","🦽")}
       ${rEq(p,"wheeledWalker","Wheeled Walker","🛞")}
     </div>
+    <div style="padding:0 20px 16px">
+      <label style="font-size:11px;font-weight:700;color:#9b6670;text-transform:uppercase;letter-spacing:0.07em;display:block;margin-bottom:6px">Others</label>
+      <input type="text" class="eq-other" id="eq-o-${p.id}" value="${esc(p.equipOthers||"")}" placeholder="e.g. Transfer board, cushion…" oninput="onEqO('${p.id}',this.value)"/>
+    </div>
   </div>
   <div class="notes-wrap">
     ${rNS(p,"physician","🩺","PHYSICIAN ORDER NOTES","Enter physician orders…",false)}
@@ -734,6 +740,11 @@ async function togChk(pid,key){
   const nc={...p.checklist,[key]:!p.checklist[key]};
   updL(pid,{checklist:nc});renderMain();renderSidebar();
   await db.from("patients").update({checklist:nc,updated_at:new Date().toISOString()}).eq("id",pid);
+}
+function onEqO(pid,val){
+  updL(pid,{equipOthers:val});
+  clearTimeout(window._eqt);
+  window._eqt=setTimeout(()=>db.from("patients").update({equip_others:val,updated_at:new Date().toISOString()}).eq("id",pid),600);
 }
 function onNI(pid,field,el){
   updL(pid,{[field]:el.value});
