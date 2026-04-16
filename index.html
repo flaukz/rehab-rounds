@@ -266,7 +266,29 @@ input,select,textarea{font-family:var(--font);}
 .conf-msg{font-size:13px;color:var(--mu);line-height:1.6;margin-bottom:6px;}
 .conf-sub{font-size:12px;color:var(--fa);margin-bottom:24px;}
 
-/* MISC */
+/* USER MANAGEMENT */
+.user-table{width:100%;border-collapse:collapse;}
+.user-table th{font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:0.07em;padding:10px 16px;text-align:left;background:#fdf0f1;border-bottom:1px solid #f5d5d8;}
+.user-table td{padding:11px 16px;font-size:13px;color:var(--td);border-bottom:1px solid #fdf0f1;vertical-align:middle;}
+.user-table tr:last-child td{border-bottom:none;}
+.user-table tr:hover td{background:#fdf8f8;}
+.role-pill{font-size:10px;font-weight:700;border-radius:20px;padding:3px 10px;display:inline-block;}
+.rp-pending{background:#fef9c3;color:#854d0e;}
+.rp-user{background:#e0eaf5;color:#4b5563;}
+.rp-admin_officer{background:#a78bfa;color:#1e1e1e;}
+.rp-admin{background:#fbbf24;color:#1e1e1e;}
+.ua-btn{padding:4px 11px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid #edcacf;background:#fdf0f1;color:var(--mid);margin:2px;}
+.ua-btn:hover{background:#f7d5d8;}
+.ua-approve{border-color:#86efac;background:#f0fdf4;color:#166534;}
+.ua-approve:hover{background:#dcfce7;}
+.ua-promote{border-color:#a78bfa;background:#f5f3ff;color:#5b21b6;}
+.ua-promote:hover{background:#ede9fe;}
+.ua-demote{border-color:#fecaca;background:#fff5f5;color:#dc2626;}
+.ua-demote:hover{background:#fee2e2;}
+.ua-reject{border-color:#fca5a5;background:#dc2626;color:#fff;}
+.ua-reject:hover{background:#b91c1c;}
+.pending-banner{background:#fef9c3;border:1px solid #f59e0b;border-radius:10px;padding:10px 16px;font-size:12px;color:#92400e;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+
 #toast{position:fixed;top:20px;right:24px;z-index:2000;border-radius:12px;padding:12px 20px;font-size:13px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,0.18);color:#fff;display:none;max-width:340px;}
 .badge{background:#fbbf24;color:#2d1417;border-radius:20px;padding:0 6px;font-size:10px;font-weight:700;}
 #loader{position:fixed;inset:0;background:rgba(45,20,23,0.35);z-index:8000;display:none;align-items:center;justify-content:center;pointer-events:none;}
@@ -324,6 +346,7 @@ input,select,textarea{font-family:var(--font);}
       <button class="hdr-btn" onclick="openSheetModal()">🔗 Google Sheet <span id="sync-ind"></span></button>
       <button class="hdr-btn" id="sync-now-btn" onclick="syncNow()" style="display:none">🔄 Sync Now</button>
       <button class="hdr-btn" onclick="openArchiveModal()">🗄️ Archive <span class="badge" id="arc-count" style="display:none"></span></button>
+      <button class="hdr-btn" id="hdr-admin-btn" onclick="openAdminPanel()" style="display:none">👑 Users</button>
       <span class="hdr-date" id="hdr-date"></span>
       <span class="hdr-user" id="hdr-user"></span>
       <div class="hdr-avatar" id="hdr-av" onclick="doLogout()" title="Click to sign out">?</div>
@@ -372,7 +395,8 @@ const DEF_CHK = {stable:false,unstable:false,bariatricWheelchair:false,comfortWh
 //  STATE
 // ═══════════════════════════════════════
 let S = { patients:[], archive:[], selected:null, search:"", sheetUrl:localStorage.getItem("cr_sheet")||"", syncSt:"idle" };
-let currentUser=null, currentName="";
+let currentUser=null, currentName="", currentRole="pending";
+const isAdmin=()=>currentRole==="admin";
 const collapsed = new Set();
 
 // ═══════════════════════════════════════
@@ -446,14 +470,13 @@ async function doRegister(){
     btn.disabled=false;btn.textContent="Create Account";
     if(error){err.textContent=error.message;return;}
     if(!data?.user){err.textContent="Something went wrong. Please try again.";return;}
+    // Insert as 'pending' — must be approved by admin before they can access the app
+    await db.from("user_roles").upsert(
+      {user_id:data.user.id,role:"pending",full_name:name},
+      {onConflict:"user_id"}
+    );
     ["rn","re","rp","rp2"].forEach(id=>{const el=document.getElementById(id);if(el)el.value="";});
-    if(data.session){
-      ok.textContent="✅ Account created! Signing you in…";
-      setTimeout(()=>onLogin(data.user),1200);
-    }else{
-      ok.textContent="✅ Account created! Check your email to confirm, then sign in.";
-      setTimeout(()=>switchAuthTab("signin"),3000);
-    }
+    ok.textContent="✅ Account created! Your account is pending admin approval. You'll be able to sign in once approved.";
   }catch(e){
     btn.disabled=false;btn.textContent="Create Account";
     err.textContent="Unexpected error: "+e.message;
@@ -462,12 +485,42 @@ async function doRegister(){
 async function onLogin(user){
   currentUser=user;
   currentName=user.user_metadata?.full_name||user.email.split("@")[0];
+
+  // Fetch role
+  const {data:roleRow}=await db.from("user_roles").select("role,full_name").eq("user_id",user.id).maybeSingle();
+  if(roleRow){
+    currentRole=roleRow.role||"pending";
+    if(roleRow.full_name)currentName=roleRow.full_name;
+  }else{
+    // No role row — insert as pending
+    await db.from("user_roles").upsert(
+      {user_id:user.id,role:"pending",full_name:currentName},
+      {onConflict:"user_id"}
+    );
+    currentRole="pending";
+  }
+
+  // Block pending users
+  if(currentRole==="pending"){
+    await db.auth.signOut();
+    const err=document.getElementById("login-err");
+    if(err)err.textContent="⏳ Your account is pending admin approval. Please wait for approval before signing in.";
+    const btn=document.getElementById("login-btn");
+    if(btn){btn.disabled=false;btn.textContent="Sign In";}
+    return;
+  }
+
   document.getElementById("login-screen").style.display="none";
   document.getElementById("app").style.display="flex";
   const av=document.getElementById("hdr-av");
   av.textContent=currentName.slice(0,2).toUpperCase();
   av.title=`Signed in as ${user.email} — click to sign out`;
   document.getElementById("hdr-user").textContent=currentName;
+
+  // Show admin button for admins only
+  const adminBtn=document.getElementById("hdr-admin-btn");
+  if(adminBtn)adminBtn.style.display=isAdmin()?"":"none";
+
   loader("Loading patients…");
   await loadAll();
   noloader();
@@ -1083,6 +1136,110 @@ function parseCSV(text){
       highPriority:row.highpriority?.toLowerCase()==="true"||row.highpriority==="1",
       isUrgent:row.isurgent?.toLowerCase()==="true"||row.isurgent==="1",ward};
   }).filter(r=>r.name&&r.mrn);
+}
+
+// ═══════════════════════════════════════
+//  ADMIN USER MANAGEMENT
+// ═══════════════════════════════════════
+const ROLE_LABELS={"pending":"⏳ Pending","user":"👤 User","admin_officer":"🔷 Admin Officer","admin":"👑 Admin"};
+const ROLE_PILLS={"pending":"rp-pending","user":"rp-user","admin_officer":"rp-admin_officer","admin":"rp-admin"};
+
+async function openAdminPanel(){
+  if(!isAdmin()){toast("Admin access only.","#dc2626");return;}
+  loader("Loading users…");
+  const {data:users,error}=await db.from("user_roles").select("*").order("created_at");
+  noloader();
+  if(error){toast("Failed to load users: "+error.message,"#dc2626");return;}
+
+  const all=users||[];
+  const pending=all.filter(u=>u.role==="pending");
+  const fmtDate=iso=>{if(!iso)return"—";return new Date(iso).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});};
+
+  const pendingBanner=pending.length>0
+    ?`<div class="pending-banner">⏳ <strong>${pending.length} user${pending.length!==1?"s":""} waiting for approval</strong></div>`:"";
+
+  const rows=all.map(u=>{
+    const isMe=u.user_id===currentUser?.id;
+    const role=u.role||"pending";
+    const pill=`<span class="role-pill ${ROLE_PILLS[role]||"rp-pending"}">${ROLE_LABELS[role]||role}</span>`;
+    let actions="";
+    if(isMe){
+      actions=`<span style="font-size:11px;color:var(--mu);font-style:italic">You</span>`;
+    }else if(role==="pending"){
+      actions=`
+        <button class="ua-btn ua-approve" onclick="changeRole('${u.user_id}','user')">✅ Approve</button>
+        <button class="ua-btn ua-reject" onclick="rejectUser('${u.user_id}','${esc(u.full_name||"this user")}')">✕ Reject</button>`;
+    }else if(role==="user"){
+      actions=`
+        <button class="ua-btn ua-promote" onclick="changeRole('${u.user_id}','admin_officer')">→ Admin Officer</button>
+        <button class="ua-btn ua-promote" style="border-color:#f59e0b;background:#fffbeb;color:#92400e" onclick="changeRole('${u.user_id}','admin')">→ Admin</button>`;
+    }else if(role==="admin_officer"){
+      actions=`
+        <button class="ua-btn ua-promote" style="border-color:#f59e0b;background:#fffbeb;color:#92400e" onclick="changeRole('${u.user_id}','admin')">→ Admin</button>
+        <button class="ua-btn ua-demote" onclick="changeRole('${u.user_id}','user')">→ User</button>`;
+    }else if(role==="admin"){
+      actions=`
+        <button class="ua-btn ua-demote" onclick="changeRole('${u.user_id}','admin_officer')">→ Admin Officer</button>
+        <button class="ua-btn ua-demote" onclick="changeRole('${u.user_id}','user')">→ User</button>`;
+    }
+    return `<tr>
+      <td><strong>${esc(u.full_name||"—")}</strong>${isMe?' <span style="font-size:10px;color:var(--mu)">(you)</span>':""}</td>
+      <td>${pill}</td>
+      <td style="font-size:11px;color:var(--fa)">${fmtDate(u.created_at)}</td>
+      <td><div style="display:flex;flex-wrap:wrap;gap:2px">${actions}</div></td>
+    </tr>`;
+  }).join("");
+
+  showModal(`
+    <div class="modal-head">
+      <span class="modal-title">👑 User Management</span>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div style="padding:12px 20px;background:#fdf0f1;border-bottom:1px solid #f5d5d8;font-size:12px;color:#9b2335;">
+      ${pendingBanner}
+      <strong>${all.length}</strong> registered user${all.length!==1?"s":""}. Role changes take effect on next sign-in.
+    </div>
+    <div style="overflow:auto;max-height:60vh;">
+      <table class="user-table">
+        <thead><tr><th>Name</th><th>Role</th><th>Joined</th><th>Actions</th></tr></thead>
+        <tbody>${rows||`<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--fa)">No users found.</td></tr>`}</tbody>
+      </table>
+    </div>
+  `,false,true);
+}
+
+async function changeRole(userId,newRole){
+  if(!isAdmin()){toast("Admin access only.","#dc2626");return;}
+  loader("Updating…");
+  const {error}=await db.from("user_roles").update({role:newRole}).eq("user_id",userId);
+  noloader();
+  if(error){toast("Failed: "+error.message,"#dc2626");return;}
+  toast(`Role updated to ${ROLE_LABELS[newRole]} ✓`,"#16a34a");
+  openAdminPanel();
+}
+
+function rejectUser(userId,name){
+  showModal(`<div class="confirm-box">
+    <div class="conf-icon">🗑️</div>
+    <div class="conf-title">Reject User?</div>
+    <div class="conf-msg"><strong>${esc(name)}</strong>'s account will be permanently deleted.</div>
+    <div class="conf-sub">They will not be able to sign in with this account.</div>
+    <div class="modal-acts" style="width:100%">
+      <button class="btn-cancel" onclick="openAdminPanel()">Cancel</button>
+      <button class="btn-danger" onclick="confirmReject('${userId}')">Reject & Delete</button>
+    </div>
+  </div>`);
+}
+
+async function confirmReject(userId){
+  if(!isAdmin()){toast("Admin access only.","#dc2626");return;}
+  loader("Rejecting user…");
+  // Delete from user_roles — the auth user remains but has no role so can't access
+  const {error}=await db.from("user_roles").delete().eq("user_id",userId);
+  noloader();
+  if(error){toast("Failed: "+error.message,"#dc2626");return;}
+  toast("User rejected and removed.","#dc2626");
+  openAdminPanel();
 }
 </script>
 </body>
