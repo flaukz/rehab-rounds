@@ -348,6 +348,7 @@ input,select,textarea{font-family:var(--font);}
       <button class="hdr-btn" onclick="openArchiveModal()">🗄️ Archive <span class="badge" id="arc-count" style="display:none"></span></button>
       <button class="hdr-btn" id="hdr-admin-btn" onclick="openAdminPanel()" style="display:none">👑 Users</button>
       <span class="hdr-date" id="hdr-date"></span>
+      <span id="hdr-role-badge" style="font-size:10px;font-weight:700;border-radius:20px;padding:3px 10px;"></span>
       <span class="hdr-user" id="hdr-user"></span>
       <div class="hdr-avatar" id="hdr-av" onclick="doLogout()" title="Click to sign out">?</div>
     </div>
@@ -396,7 +397,13 @@ const DEF_CHK = {stable:false,unstable:false,bariatricWheelchair:false,comfortWh
 // ═══════════════════════════════════════
 let S = { patients:[], archive:[], selected:null, search:"", sheetUrl:localStorage.getItem("cr_sheet")||"", syncSt:"idle" };
 let currentUser=null, currentName="", currentRole="pending";
-const isAdmin=()=>currentRole==="admin";
+const isAdmin        = ()=>currentRole==="admin";
+const isAdminOfficer = ()=>currentRole==="admin_officer";
+const canManagePatients = ()=>["admin","admin_officer"].includes(currentRole); // add, edit, archive
+const canDeletePatients = ()=>currentRole==="admin";                           // permanent delete only
+const canManageUsers    = ()=>currentRole==="admin";                           // user panel only
+const canSync           = ()=>["admin","admin_officer"].includes(currentRole);
+const canWriteNotes     = ()=>["admin","admin_officer","user"].includes(currentRole);
 const collapsed = new Set();
 
 // ═══════════════════════════════════════
@@ -517,9 +524,26 @@ async function onLogin(user){
   av.title=`Signed in as ${user.email} — click to sign out`;
   document.getElementById("hdr-user").textContent=currentName;
 
-  // Show admin button for admins only
+  // Show/hide header buttons based on role
   const adminBtn=document.getElementById("hdr-admin-btn");
-  if(adminBtn)adminBtn.style.display=isAdmin()?"":"none";
+  const syncBtn=document.getElementById("sync-now-btn");
+  const addBtn=document.getElementById("btn-add-patient");
+  if(adminBtn)adminBtn.style.display=canManageUsers()?"":"none";
+  if(addBtn)addBtn.style.display=canManagePatients()?"":"none";
+
+  // Role badge
+  const roleBadge=document.getElementById("hdr-role-badge");
+  if(roleBadge){
+    const badgeMap={
+      "admin":       {label:"👑 Admin",        bg:"#fbbf24",color:"#1e1e1e"},
+      "admin_officer":{label:"🔷 Admin Officer",bg:"#a78bfa",color:"#1e1e1e"},
+      "user":        {label:"👤 User",          bg:"rgba(255,255,255,0.2)",color:"#fff"},
+    };
+    const b=badgeMap[currentRole]||{label:currentRole,bg:"rgba(255,255,255,0.15)",color:"#fff"};
+    roleBadge.textContent=b.label;
+    roleBadge.style.background=b.bg;
+    roleBadge.style.color=b.color;
+  }
 
   loader("Loading patients…");
   await loadAll();
@@ -599,6 +623,11 @@ function renderSidebar(){
   const buildRow=p=>{
     const isAct=p.id===S.selected;
     const done=Object.values(p.checklist).filter(Boolean).length;
+    const acts=[
+      canManagePatients() ? `<button class="re-btn" onclick="event.stopPropagation();openEditModal('${p.id}')">✏️</button>` : "",
+      canManagePatients() ? `<button class="ra-btn" onclick="event.stopPropagation();openArcConfirm('${p.id}')">Archive</button>` : "",
+      canDeletePatients() ? `<button class="rd-btn" onclick="event.stopPropagation();openDelConfirm('${p.id}')">🗑️</button>` : "",
+    ].join("");
     return `<div class="pat-row${isAct?" active":""}" onclick="selPat('${p.id}')">
       <div class="row-top">
         <div style="display:flex;align-items:center;gap:7px">
@@ -615,11 +644,7 @@ function renderSidebar(){
         <span class="row-pt">${esc(p.primaryPt||"")}</span>
         <span class="row-done${done>=2?" complete":""}">${done}/11</span>
       </div>
-      <div class="row-acts">
-        <button class="re-btn" onclick="event.stopPropagation();openEditModal('${p.id}')">✏️</button>
-        <button class="ra-btn" onclick="event.stopPropagation();openArcConfirm('${p.id}')">Archive</button>
-        <button class="rd-btn" onclick="event.stopPropagation();openDelConfirm('${p.id}')">🗑️</button>
-      </div>
+      ${acts?`<div class="row-acts">${acts}</div>`:""}
     </div>`;
   };
   const sortR=arr=>[...arr].sort((a,b)=>{const nA=parseInt(a.room)||0,nB=parseInt(b.room)||0;return nA!==nB?nA-nB:a.room.localeCompare(b.room);});
@@ -644,7 +669,10 @@ function renderSidebar(){
 function renderMain(){
   const main=document.getElementById("main");
   const p=getSel();
-  if(!p){main.innerHTML=`<div class="empty-main" style="display:flex"><div class="big-icon" style="font-size:48px">🏥</div><p style="font-size:15px;color:var(--mu)">No patients yet.</p><button class="btn-primary" style="flex:none;padding:10px 22px;border-radius:10px" onclick="openAddModal()">+ Add First Patient</button></div>`;return;}
+  if(!p){
+    main.innerHTML=`<div class="empty-main" style="display:flex"><div class="big-icon" style="font-size:48px">🏥</div><p style="font-size:15px;color:var(--mu)">No patients yet.</p>${canManagePatients()?`<button class="btn-primary" style="flex:none;padding:10px 22px;border-radius:10px" onclick="openAddModal()">+ Add First Patient</button>`:""}</div>`;
+    return;
+  }
   const ini=p.name.split(" ").map(n=>n[0]).join("").slice(0,2);
   main.innerHTML=`
   <div class="pat-card">
@@ -665,7 +693,7 @@ function renderMain(){
       </div>
     </div>
     <div class="pat-card-r">
-      <button class="edit-pat-btn" onclick="openEditModal('${p.id}')">✏️ Edit</button>
+      ${canManagePatients()?`<button class="edit-pat-btn" onclick="openEditModal('${p.id}')">✏️ Edit</button>`:""}
       <span class="${wbc(p.ward)}" style="font-size:12px;padding:5px 14px;font-weight:700">${esc(p.ward||"Ward A")}</span>
       <span class="cls-badge cls-${p.classification}" style="font-size:12px;padding:5px 14px;font-weight:700">${p.classification}</span>
     </div>
@@ -972,8 +1000,14 @@ function showModal(html,wide,arcBox){
 function closeModal(){document.getElementById("modal-overlay").style.display="none";}
 function handleOverlayClick(e){if(e.target===document.getElementById("modal-overlay"))closeModal();}
 
-function openAddModal(){showModal(patForm(null));}
-function openEditModal(id){const p=S.patients.find(x=>x.id===id);if(p)showModal(patForm(p));}
+function openAddModal(){
+  if(!canManagePatients()){toast("You don't have permission to add patients.","#dc2626");return;}
+  showModal(patForm(null));
+}
+function openEditModal(id){
+  if(!canManagePatients()){toast("You don't have permission to edit patients.","#dc2626");return;}
+  const p=S.patients.find(x=>x.id===id);if(p)showModal(patForm(p));
+}
 
 function patForm(p){
   const ie=!!p,v=p||{room:"",name:"",mrn:"",primaryPt:"",primaryOt:"",primarySlp:"",classification:"ABM",highPriority:false,isUrgent:false,ward:"Ward A"};
@@ -1036,6 +1070,7 @@ async function subPat(eid){
 }
 
 function openArcConfirm(id){
+  if(!canManagePatients()){toast("You don't have permission to archive patients.","#dc2626");return;}
   const p=S.patients.find(x=>x.id===id);if(!p)return;
   showModal(`<div class="confirm-box"><div class="conf-icon">🗄️</div><div class="conf-title">Archive Patient?</div><div class="conf-msg"><strong>${esc(p.name)}</strong> (Room ${esc(p.room)}) will be moved to the archive.</div><div class="conf-sub">Restore later by name or MRN.</div><div class="modal-acts" style="width:100%"><button class="btn-cancel" onclick="closeModal()">Cancel</button><button class="btn-danger" onclick="arcPat('${id}')">Archive</button></div></div>`);
 }
@@ -1051,6 +1086,7 @@ async function arcPat(id){
 }
 
 function openDelConfirm(id){
+  if(!canDeletePatients()){toast("Only admins can permanently delete patients.","#dc2626");return;}
   const p=S.patients.find(x=>x.id===id);if(!p)return;
   showModal(`<div class="confirm-box"><div class="conf-icon">🗑️</div><div class="conf-title">Delete Patient?</div><div class="conf-msg"><strong>${esc(p.name)}</strong> will be <strong>permanently deleted</strong>.</div><div class="conf-sub">Cannot be undone. All notes and history will be lost.</div><div class="modal-acts" style="width:100%"><button class="btn-cancel" onclick="closeModal()">Cancel</button><button class="btn-danger" onclick="permDel('${id}')">Delete Permanently</button></div></div>`);
 }
@@ -1072,6 +1108,7 @@ function renderArcModal(q){
   showModal(`<div class="modal-head"><span class="modal-title">🗄️ Patient Archive</span><button class="modal-close" onclick="closeModal()">×</button></div><div class="arc-search"><input class="fi" autofocus placeholder="Search by name or MRN…" value="${esc(q)}" oninput="renderArcModal(this.value)" style="font-size:14px"/></div><div class="arc-list modal-body scroll" style="padding:0">${rows}</div>`,false,true);
 }
 async function restorePat(id){
+  if(!canManagePatients()){toast("You don't have permission to restore patients.","#dc2626");return;}
   loader("Restoring…");
   await db.from("patients").update({is_archived:false,archived_at:null}).eq("id",id);
   noloader();
@@ -1091,6 +1128,7 @@ function openSheetModal(){
 }
 function saveSheet(){S.sheetUrl=document.getElementById("su").value.trim();localStorage.setItem("cr_sheet",S.sheetUrl);closeModal();syncNow();}
 async function syncNow(){
+  if(!canSync()){toast("You don't have permission to sync.","#dc2626");return;}
   if(!S.sheetUrl){toast("No Google Sheet URL configured.","#dc2626");return;}
   S.syncSt="syncing";renderHdr();
   try{
