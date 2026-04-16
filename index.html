@@ -744,7 +744,11 @@ async function togChk(pid,key){
 function onEqO(pid,val){
   updL(pid,{equipOthers:val});
   clearTimeout(window._eqt);
-  window._eqt=setTimeout(()=>db.from("patients").update({equip_others:val,updated_at:new Date().toISOString()}).eq("id",pid),600);
+  window._eqt=setTimeout(async()=>{
+    const {error}=await db.from("patients").update({equip_others:val,updated_at:new Date().toISOString()}).eq("id",pid);
+    if(error){toast("Failed to save Others: "+error.message,"#dc2626");}
+    else{toast("Others saved ✓","#16a34a");}
+  },600);
 }
 function onNI(pid,field,el){
   updL(pid,{[field]:el.value});
