@@ -343,8 +343,6 @@ input,select,textarea{font-family:var(--font);}
       <div><div class="hdr-title">Salma Rahba Rehabilitation Medicine</div><div class="hdr-sub">Hospital Rounding System</div></div>
     </div>
     <div class="hdr-actions">
-      <button class="hdr-btn" onclick="openSheetModal()">🔗 Google Sheet <span id="sync-ind"></span></button>
-      <button class="hdr-btn" id="sync-now-btn" onclick="syncNow()" style="display:none">🔄 Sync Now</button>
       <button class="hdr-btn" onclick="openArchiveModal()">🗄️ Archive <span class="badge" id="arc-count" style="display:none"></span></button>
       <button class="hdr-btn" id="hdr-admin-btn" onclick="openAdminPanel()" style="display:none">👑 Users</button>
       <span class="hdr-date" id="hdr-date"></span>
@@ -395,14 +393,13 @@ const DEF_CHK = {stable:false,unstable:false,bariatricWheelchair:false,comfortWh
 // ═══════════════════════════════════════
 //  STATE
 // ═══════════════════════════════════════
-let S = { patients:[], archive:[], selected:null, search:"", sheetUrl:localStorage.getItem("cr_sheet")||"", syncSt:"idle" };
+let S = { patients:[], archive:[], selected:null, search:"" };
 let currentUser=null, currentName="", currentRole="pending";
 const isAdmin        = ()=>currentRole==="admin";
 const isAdminOfficer = ()=>currentRole==="admin_officer";
 const canManagePatients = ()=>["admin","admin_officer"].includes(currentRole); // add, edit, archive
 const canDeletePatients = ()=>currentRole==="admin";                           // permanent delete only
 const canManageUsers    = ()=>currentRole==="admin";                           // user panel only
-const canSync           = ()=>["admin","admin_officer"].includes(currentRole);
 const canWriteNotes     = ()=>["admin","admin_officer","user"].includes(currentRole);
 const collapsed = new Set();
 
@@ -526,7 +523,6 @@ async function onLogin(user){
 
   // Show/hide header buttons based on role
   const adminBtn=document.getElementById("hdr-admin-btn");
-  const syncBtn=document.getElementById("sync-now-btn");
   const addBtn=document.getElementById("btn-add-patient");
   if(adminBtn)adminBtn.style.display=canManageUsers()?"":"none";
   if(addBtn)addBtn.style.display=canManagePatients()?"":"none";
@@ -608,8 +604,6 @@ function render(){renderHdr();renderSidebar();renderMain();}
 
 function renderHdr(){
   document.getElementById("hdr-date").textContent=new Date().toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});
-  document.getElementById("sync-now-btn").style.display=S.sheetUrl?"":"none";
-  document.getElementById("sync-ind").textContent=S.syncSt==="syncing"?" ⏳":S.syncSt==="ok"?" ✓":S.syncSt==="error"?" ⚠️":"";
   const ac=document.getElementById("arc-count");
   if(S.archive.length>0){ac.style.display="";ac.textContent=S.archive.length;}else ac.style.display="none";
 }
@@ -1117,63 +1111,6 @@ async function restorePat(id){
   S.patients.push(patient);S.archive=S.archive.filter(x=>x.id!==id);
   S.selected=patient.id;
   closeModal();render();toast(`${patient.name} restored ✓`,"#16a34a");
-}
-
-// Google Sheet
-function openSheetModal(){
-  showModal(`<div class="modal-head"><span class="modal-title">🔗 Google Sheet Sync</span><button class="modal-close" onclick="closeModal()">×</button></div>
-  <div class="modal-body"><div class="info-box"><strong>How to connect:</strong><br/>1. Google Sheet → File → Share → Publish to web → CSV → Copy URL<br/><br/><strong>Required columns:</strong> room, name, mrn, primaryPt, primaryOt, primarySlp, classification, highPriority, isUrgent, ward</div>
-  <div><label class="fl">CSV Publish URL</label><input class="fi" id="su" value="${esc(S.sheetUrl)}" placeholder="https://docs.google.com/spreadsheets/d/.../pub?output=csv"/></div>
-  <div class="modal-acts"><button class="btn-cancel" onclick="closeModal()">Cancel</button><button class="btn-primary" onclick="saveSheet()">Save &amp; Sync</button></div></div>`,true);
-}
-function saveSheet(){S.sheetUrl=document.getElementById("su").value.trim();localStorage.setItem("cr_sheet",S.sheetUrl);closeModal();syncNow();}
-async function syncNow(){
-  if(!canSync()){toast("You don't have permission to sync.","#dc2626");return;}
-  if(!S.sheetUrl){toast("No Google Sheet URL configured.","#dc2626");return;}
-  S.syncSt="syncing";renderHdr();
-  try{
-    const res=await fetch(S.sheetUrl);if(!res.ok)throw new Error("HTTP "+res.status);
-    const rows=parseCSV(await res.text());if(!rows.length)throw new Error("empty");
-    loader(`Syncing ${rows.length} patients…`);
-    for(const r of rows){
-      const ex=S.patients.find(p=>p.mrn===r.mrn);
-      const upd={room:r.room,name:r.name,primary_pt:r.primaryPt||"",primary_ot:r.primaryOt||"",primary_slp:r.primarySlp||"",classification:r.classification,high_priority:r.highPriority,is_urgent:r.isUrgent||false,ward:r.ward||"Ward A",updated_at:new Date().toISOString()};
-      if(ex){await db.from("patients").update(upd).eq("id",ex.id);updL(ex.id,{room:r.room,name:r.name,primaryPt:r.primaryPt||"",primaryOt:r.primaryOt||"",primarySlp:r.primarySlp||"",classification:r.classification,highPriority:r.highPriority,isUrgent:r.isUrgent||false,ward:r.ward||"Ward A"});}
-      else{const {data}=await db.from("patients").insert({...upd,mrn:r.mrn,checklist:DEF_CHK,equip_others:""}).select().single();if(data)S.patients.push(p2l(data,{}));}
-    }
-    noloader();S.syncSt="ok";render();toast(`Synced ${rows.length} patients ✓`,"#16a34a");
-  }catch(e){
-    noloader();S.syncSt="error";renderHdr();
-    toast("Sync failed. Check the URL and make sure the sheet is published publicly.","#dc2626");
-  }
-}
-function parseCSV(text){
-  const lines=text.trim().split("\n").filter(Boolean);if(lines.length<2)return[];
-  // Properly parse CSV respecting quoted fields
-  const parseLine=line=>{
-    const cols=[];let cur="",inQ=false;
-    for(let i=0;i<line.length;i++){
-      const c=line[i];
-      if(c==='"'){inQ=!inQ;}
-      else if(c===","&&!inQ){cols.push(cur.trim());cur="";}
-      else{cur+=c;}
-    }
-    cols.push(cur.trim());
-    return cols;
-  };
-  const hd=parseLine(lines[0]).map(h=>h.toLowerCase().replace(/[^a-z]/g,""));
-  return lines.slice(1).map((line,i)=>{
-    const cols=parseLine(line);
-    const row={};hd.forEach((h,idx)=>{row[h]=(cols[idx]??"").replace(/^"|"$/g,"");});
-    const cls=(row.classification||"").toUpperCase();
-    const vW=WARDS.map(w=>w.id);const rW=(row.ward||"").trim();
-    const ward=vW.find(w=>w.toLowerCase()===rW.toLowerCase())||"Ward A";
-    return{id:row.mrn||`csv-${i}`,room:row.room||"",name:row.name||"",mrn:row.mrn||"",
-      primaryPt:row.primarypt||row.therapist||"",primaryOt:row.primaryot||"",primarySlp:row.primaryslp||"",
-      classification:["ABM","LC","LTC","SSR","PAR"].includes(cls)?cls:"ABM",
-      highPriority:row.highpriority?.toLowerCase()==="true"||row.highpriority==="1",
-      isUrgent:row.isurgent?.toLowerCase()==="true"||row.isurgent==="1",ward};
-  }).filter(r=>r.name&&r.mrn);
 }
 
 // ═══════════════════════════════════════
