@@ -159,6 +159,10 @@ input,select,textarea{font-family:var(--font);}
 .eq-chk{font-size:11px;font-weight:700;color:#9b2335;background:#fad5d9;border-radius:20px;padding:1px 7px;margin-left:2px;}
 .eq-other{width:100%;padding:8px 12px;border-radius:8px;border:1.5px solid #edcacf;outline:none;font-size:13px;color:#3d1e22;background:#fdf8f8;font-family:var(--font);}
 .eq-other:focus{border-color:#9b2335;}
+.eq-others-saved{background:#fdf8f8;border:1.5px solid #edcacf;border-radius:8px;padding:9px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.eq-others-text{font-size:13px;color:#3d1e22;flex:1;}
+.eq-others-acts{display:flex;gap:6px;flex-shrink:0;}
+.eq-others-edit{display:flex;flex-direction:column;}
 
 /* NOTES */
 .notes-wrap{display:flex;flex-direction:column;gap:14px;}
@@ -632,8 +636,29 @@ function renderMain(){
       ${rEq(p,"wheeledWalker","Wheeled Walker","🛞")}
     </div>
     <div style="padding:0 20px 16px">
-      <label style="font-size:11px;font-weight:700;color:#9b6670;text-transform:uppercase;letter-spacing:0.07em;display:block;margin-bottom:6px">Others</label>
-      <input type="text" class="eq-other" id="eq-o-${p.id}" value="${esc(p.equipOthers||"")}" placeholder="e.g. Transfer board, cushion…" oninput="onEqO('${p.id}',this.value)"/>
+      <label style="font-size:11px;font-weight:700;color:#9b6670;text-transform:uppercase;letter-spacing:0.07em;display:block;margin-bottom:8px">Others</label>
+      ${p.equipOthers
+        ? `<div class="eq-others-saved" id="eq-saved-${p.id}">
+            <div class="eq-others-text" id="eq-text-${p.id}">${esc(p.equipOthers)}</div>
+            <div class="eq-others-acts">
+              <button class="ne-btn ne-edit" onclick="openEqEdit('${p.id}')">✏️ Edit</button>
+              <button class="ne-btn ne-del" onclick="deleteEqO('${p.id}')">🗑 Delete</button>
+            </div>
+          </div>
+          <div class="eq-others-edit" id="eq-edit-${p.id}" style="display:none">
+            <input type="text" class="eq-other" id="eq-o-${p.id}" value="${esc(p.equipOthers)}" placeholder="e.g. Transfer board, cushion…"/>
+            <div class="eq-others-acts" style="margin-top:7px">
+              <button class="ne-btn ne-cancel" onclick="cancelEqEdit('${p.id}')">Cancel</button>
+              <button class="ne-btn ne-save" onclick="commitEqO('${p.id}')">Save</button>
+            </div>
+          </div>`
+        : `<div id="eq-edit-${p.id}">
+            <input type="text" class="eq-other" id="eq-o-${p.id}" value="" placeholder="e.g. Transfer board, cushion…"/>
+            <div style="display:flex;justify-content:flex-end;margin-top:7px">
+              <button class="ne-btn ne-save" onclick="commitEqO('${p.id}')">Save</button>
+            </div>
+          </div>`
+      }
     </div>
   </div>
   <div class="notes-wrap">
@@ -741,14 +766,34 @@ async function togChk(pid,key){
   updL(pid,{checklist:nc});renderMain();renderSidebar();
   await db.from("patients").update({checklist:nc,updated_at:new Date().toISOString()}).eq("id",pid);
 }
-function onEqO(pid,val){
+async function commitEqO(pid){
+  const input=document.getElementById("eq-o-"+pid);
+  if(!input)return;
+  const val=input.value.trim();
+  const {error}=await db.from("patients").update({equip_others:val,updated_at:new Date().toISOString()}).eq("id",pid);
+  if(error){toast("Failed to save: "+error.message,"#dc2626");return;}
   updL(pid,{equipOthers:val});
-  clearTimeout(window._eqt);
-  window._eqt=setTimeout(async()=>{
-    const {error}=await db.from("patients").update({equip_others:val,updated_at:new Date().toISOString()}).eq("id",pid);
-    if(error){toast("Failed to save Others: "+error.message,"#dc2626");}
-    else{toast("Others saved ✓","#16a34a");}
-  },600);
+  renderMain();
+  toast("Others saved ✓","#16a34a");
+}
+function openEqEdit(pid){
+  document.getElementById("eq-saved-"+pid).style.display="none";
+  document.getElementById("eq-edit-"+pid).style.display="flex";
+  document.getElementById("eq-o-"+pid)?.focus();
+}
+function cancelEqEdit(pid){
+  const p=S.patients.find(x=>x.id===pid);if(!p)return;
+  document.getElementById("eq-edit-"+pid).style.display="none";
+  document.getElementById("eq-saved-"+pid).style.display="flex";
+  const input=document.getElementById("eq-o-"+pid);
+  if(input)input.value=p.equipOthers||"";
+}
+async function deleteEqO(pid){
+  const {error}=await db.from("patients").update({equip_others:"",updated_at:new Date().toISOString()}).eq("id",pid);
+  if(error){toast("Failed to delete: "+error.message,"#dc2626");return;}
+  updL(pid,{equipOthers:""});
+  renderMain();
+  toast("Others cleared.","#64748b");
 }
 function onNI(pid,field,el){
   updL(pid,{[field]:el.value});
