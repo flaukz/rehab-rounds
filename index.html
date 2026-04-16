@@ -698,6 +698,21 @@ function renderMain(){
       ${rCk(p,"stable","Stable","✅","#16a34a","#dcfce7","#166534")}
       ${rCk(p,"unstable","Unstable","⚠️","#dc2626","#fee2e2","#991b1b")}
     </div>
+    <div class="chk-divider"><span>🚨 Status Flags</span></div>
+    <div class="chk-items">
+      <button onclick="togFlag('${p.id}','priority')"
+        style="flex:1;min-width:140px;padding:14px 16px;border-radius:12px;border:2px solid ${p.highPriority?"#dc2626":"#f5d5d8"};background:${p.highPriority?"linear-gradient(135deg,#fee2e2,#fff8f8)":"#fdf8f8"};display:flex;align-items:center;gap:12px;transition:all 0.15s;cursor:pointer;">
+        <div style="width:28px;height:28px;border-radius:8px;background:${p.highPriority?"#dc2626":"#f5d5d8"};display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">${p.highPriority?"🚩":""}</div>
+        <div><div style="font-weight:600;font-size:13px;color:${p.highPriority?"#991b1b":"#64748b"}"> Priority</div>
+        <div style="font-size:10px;color:${p.highPriority?"#dc2626":"var(--fa)"}"> ${p.highPriority?"Marked":"Tap to mark"}</div></div>
+      </button>
+      <button onclick="togFlag('${p.id}','urgent')"
+        style="flex:1;min-width:140px;padding:14px 16px;border-radius:12px;border:2px solid ${p.isUrgent?"#dc2626":"#f5d5d8"};background:${p.isUrgent?"linear-gradient(135deg,#fee2e2,#fff8f8)":"#fdf8f8"};display:flex;align-items:center;gap:12px;transition:all 0.15s;cursor:pointer;">
+        <div style="width:28px;height:28px;border-radius:8px;background:${p.isUrgent?"#dc2626":"#f5d5d8"};display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">${p.isUrgent?"🔴":""}</div>
+        <div><div style="font-weight:600;font-size:13px;color:${p.isUrgent?"#991b1b":"#64748b"}"> Urgent</div>
+        <div style="font-size:10px;color:${p.isUrgent?"#dc2626":"var(--fa)"}"> ${p.isUrgent?"Marked":"Tap to mark"}</div></div>
+      </button>
+    </div>
     <div class="chk-divider"><span>📦 Equipment Order</span></div>
     <div class="chk-items" style="flex-wrap:wrap;gap:10px">
       ${rEq(p,"bariatricWheelchair","Bariatric Wheelchair","♿")}
@@ -840,6 +855,16 @@ async function togChk(pid,key){
   const nc={...p.checklist,[key]:!p.checklist[key]};
   updL(pid,{checklist:nc});renderMain();renderSidebar();
   await db.from("patients").update({checklist:nc,updated_at:new Date().toISOString()}).eq("id",pid);
+}
+
+async function togFlag(pid,flag){
+  const p=S.patients.find(x=>x.id===pid);if(!p)return;
+  const isPriority=flag==="priority";
+  const newVal=isPriority?!p.highPriority:!p.isUrgent;
+  const dbField=isPriority?"high_priority":"is_urgent";
+  const localField=isPriority?"highPriority":"isUrgent";
+  updL(pid,{[localField]:newVal});renderMain();renderSidebar();
+  await db.from("patients").update({[dbField]:newVal,updated_at:new Date().toISOString()}).eq("id",pid);
 }
 async function commitEqO(pid){
   const input=document.getElementById("eq-o-"+pid);
