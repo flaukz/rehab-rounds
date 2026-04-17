@@ -354,7 +354,7 @@ input,select,textarea{font-family:var(--font);}
   <div id="body">
     <aside id="sidebar">
       <div class="sidebar-top">
-        <div class="sidebar-hdr"><span class="sidebar-lbl">Patients</span><button class="btn-add" onclick="openAddModal()">+ Add</button></div>
+        <div class="sidebar-hdr"><span class="sidebar-lbl">Patients</span><button class="btn-add" id="btn-add-patient" onclick="openAddModal()">+ Add</button></div>
         <input class="search-input" type="text" placeholder="Search name, room, MRN…" oninput="onSearch(this.value)"/>
       </div>
       <div id="patient-list"></div>
@@ -396,10 +396,9 @@ const DEF_CHK = {stable:false,unstable:false,bariatricWheelchair:false,comfortWh
 let S = { patients:[], archive:[], selected:null, search:"" };
 let currentUser=null, currentName="", currentRole="pending";
 const isAdmin        = ()=>currentRole==="admin";
-const isAdminOfficer = ()=>currentRole==="admin_officer";
-const canManagePatients = ()=>["admin","admin_officer"].includes(currentRole); // add, edit, archive
-const canDeletePatients = ()=>currentRole==="admin";                           // permanent delete only
-const canManageUsers    = ()=>currentRole==="admin";                           // user panel only
+const canManagePatients = ()=>["admin","admin_officer"].includes(currentRole);
+const canDeletePatients = ()=>currentRole==="admin";
+const canManageUsers    = ()=>currentRole==="admin";
 const canWriteNotes     = ()=>["admin","admin_officer","user"].includes(currentRole);
 const collapsed = new Set();
 
@@ -407,7 +406,7 @@ const collapsed = new Set();
 //  UTILS
 // ═══════════════════════════════════════
 const esc=s=>String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
-const fmt=iso=>new Date(iso).toLocaleString("en-US",{month:"short",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit",hour12:true});
+const fmt=iso=>{if(!iso)return"—";try{return new Date(iso).toLocaleString("en-US",{month:"short",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit",hour12:true});}catch{return"—";}};
 const wkey=w=>w.toLowerCase().replace(/\s+/g,"");
 const wbc=w=>`wbadge wbadge-${wkey(w||"Ward A")}`;
 let _tt;
@@ -864,7 +863,12 @@ async function togFlag(pid,flag){
   const dbField=isPriority?"high_priority":"is_urgent";
   const localField=isPriority?"highPriority":"isUrgent";
   updL(pid,{[localField]:newVal});renderMain();renderSidebar();
-  await db.from("patients").update({[dbField]:newVal,updated_at:new Date().toISOString()}).eq("id",pid);
+  const {error}=await db.from("patients").update({[dbField]:newVal,updated_at:new Date().toISOString()}).eq("id",pid);
+  if(error){
+    // Roll back on failure
+    updL(pid,{[localField]:!newVal});renderMain();renderSidebar();
+    toast("Failed to update flag: "+error.message,"#dc2626");
+  }
 }
 async function commitEqO(pid){
   const input=document.getElementById("eq-o-"+pid);
@@ -913,18 +917,10 @@ async function saveNote(pid,draftF,histF){
   let flagRemoved=false;
   const tracked=["physicianHistory","roundHistory","ptHistory","otHistory","slpHistory"];
   if(tracked.includes(histF)){
-    if(p.highPriority){
-      changes.highPriority=false;
-      await db.from("patients").update({high_priority:false,updated_at:new Date().toISOString()}).eq("id",pid);
-      flagRemoved=true;
-      toast(`🚩 Priority flag removed — note saved for ${p.name}.`,"#9b2335");
-    }
-    if(p.isUrgent){
-      changes.isUrgent=false;
-      await db.from("patients").update({is_urgent:false,updated_at:new Date().toISOString()}).eq("id",pid);
-      flagRemoved=true;
-      toast(`🔴 Urgent flag removed — note saved for ${p.name}.`,"#dc2626");
-    }
+    const removedFlags=[];
+    if(p.highPriority){changes.highPriority=false;await db.from("patients").update({high_priority:false,updated_at:new Date().toISOString()}).eq("id",pid);removedFlags.push("🚩 Priority");}
+    if(p.isUrgent){changes.isUrgent=false;await db.from("patients").update({is_urgent:false,updated_at:new Date().toISOString()}).eq("id",pid);removedFlags.push("🔴 Urgent");}
+    if(removedFlags.length>0){flagRemoved=true;toast(`${removedFlags.join(" & ")} flag${removedFlags.length>1?"s":""} removed — note saved.`,"#9b2335");}
   }
   updL(pid,changes);renderMain();renderSidebar();
   if(!flagRemoved)toast("Note saved ✓","#16a34a");
@@ -970,8 +966,9 @@ function promptDel(pid,hk,nid){
 function cancelDel(nid){document.getElementById("dc-"+nid)?.classList.remove("open");}
 async function commitDel(pid,hk,nid){
   loader("Deleting note…");
-  await db.from("notes").delete().eq("id",nid);
+  const {error}=await db.from("notes").delete().eq("id",nid);
   noloader();
+  if(error){toast("Failed to delete note: "+error.message,"#dc2626");return;}
   const p=S.patients.find(x=>x.id===pid);if(!p)return;
   updL(pid,{[hk]:(p[hk]||[]).filter(n=>n.id!==nid)});
   renderMain();toast("Note deleted.","#64748b");
@@ -1001,8 +998,9 @@ async function postReply(pid,hk,nid){
 }
 async function delReply(pid,hk,nid,rid){
   loader("Removing reply…");
-  await db.from("replies").delete().eq("id",rid);
+  const {error}=await db.from("replies").delete().eq("id",rid);
   noloader();
+  if(error){toast("Failed to remove reply: "+error.message,"#dc2626");return;}
   const p=S.patients.find(x=>x.id===pid);if(!p)return;
   updL(pid,{[hk]:(p[hk]||[]).map(n=>n.id===nid?{...n,replies:(n.replies||[]).filter(r=>r.id!==rid)}:n)});
   renderMain();toast("Reply removed.","#64748b");
@@ -1096,11 +1094,12 @@ function openArcConfirm(id){
 async function arcPat(id){
   const p=S.patients.find(x=>x.id===id);if(!p)return;
   loader("Archiving…");
-  await db.from("patients").update({is_archived:true,archived_at:new Date().toISOString()}).eq("id",id);
+  const {error}=await db.from("patients").update({is_archived:true,archived_at:new Date().toISOString()}).eq("id",id);
   noloader();
+  if(error){toast("Failed to archive: "+error.message,"#dc2626");return;}
   S.archive.push({...p,archivedAt:new Date().toISOString()});
   S.patients=S.patients.filter(x=>x.id!==id);
-  S.selected=S.patients[0]?.id??null;
+  S.selected=S.patients.length?S.patients[0].id:null;
   closeModal();render();toast(`${p.name} archived.`,"#7c3aed");
 }
 
@@ -1123,7 +1122,7 @@ function openArchiveModal(){renderArcModal("");}
 function renderArcModal(q){
   const res=S.archive.filter(p=>p.name.toLowerCase().includes(q.toLowerCase())||p.mrn.toLowerCase().includes(q.toLowerCase()));
   const rows=res.length===0?`<div class="arc-empty">${S.archive.length===0?"No archived patients yet.":"No matches found."}</div>`
-    :res.map(p=>`<div class="arc-row"><div><div class="arc-name">${esc(p.name)}</div><div class="arc-meta">${esc(p.mrn)} · Room ${esc(p.room)} · PT: ${esc(p.primaryPt||"—")}</div><div class="arc-ts">Archived ${p.archivedAt?fmt(p.archivedAt):""}</div></div><button class="btn-restore" onclick="restorePat('${p.id}')">Restore</button></div>`).join("");
+    :res.map(p=>`<div class="arc-row"><div><div class="arc-name">${esc(p.name)}</div><div class="arc-meta">${esc(p.mrn)} · Room ${esc(p.room)} · PT: ${esc(p.primaryPt||"—")}</div><div class="arc-ts">Archived ${p.archivedAt?fmt(p.archivedAt):""}</div></div>${canManagePatients()?`<button class="btn-restore" onclick="restorePat('${p.id}')">Restore</button>`:""}</div>`).join("");
   showModal(`<div class="modal-head"><span class="modal-title">🗄️ Patient Archive</span><button class="modal-close" onclick="closeModal()">×</button></div><div class="arc-search"><input class="fi" autofocus placeholder="Search by name or MRN…" value="${esc(q)}" oninput="renderArcModal(this.value)" style="font-size:14px"/></div><div class="arc-list modal-body scroll" style="padding:0">${rows}</div>`,false,true);
 }
 async function restorePat(id){
