@@ -666,7 +666,7 @@ function renderMain(){
     main.innerHTML=`<div class="empty-main" style="display:flex"><div class="big-icon" style="font-size:48px">🏥</div><p style="font-size:15px;color:var(--mu)">No patients yet.</p>${canManagePatients()?`<button class="btn-primary" style="flex:none;padding:10px 22px;border-radius:10px" onclick="openAddModal()">+ Add First Patient</button>`:""}</div>`;
     return;
   }
-  const ini=p.name.split(" ").map(n=>n[0]).join("").slice(0,2);
+  const ini=p.name?p.name.split(" ").map(n=>n[0]||"").filter(Boolean).join("").slice(0,2).toUpperCase():"?";
   main.innerHTML=`
   <div class="pat-card">
     <div class="pat-card-l">
@@ -834,10 +834,10 @@ function rNS(p,type,icon,title,placeholder,replies){
       ${hist.length>0?`<span class="note-cnt">${hist.length} saved ${hist.length===1?"note":"notes"}</span>`:""}
     </div>
     <div class="note-input-area">
-      <textarea class="note-ta" placeholder="${placeholder}" oninput="onNI('${p.id}','${dk}',this)" id="nta-${type}-${p.id}">${esc(draft)}</textarea>
+      ${canWriteNotes()?`<textarea class="note-ta" placeholder="${placeholder}" oninput="onNI('${p.id}','${dk}',this)" id="nta-${type}-${p.id}">${esc(draft)}</textarea>
       <div class="note-save-row">
         <button class="note-save-btn${hasT?" active":""}" id="nsb-${type}-${p.id}" onclick="saveNote('${p.id}','${dk}','${hk}')">Save Note</button>
-      </div>
+      </div>`:`<p style="padding:10px 0 12px;font-size:12px;color:var(--mu);font-style:italic">View only — your role cannot add notes.</p>`}
     </div>${hHTML}
   </div>`;
 }
@@ -853,7 +853,12 @@ async function togChk(pid,key){
   const p=S.patients.find(x=>x.id===pid);if(!p)return;
   const nc={...p.checklist,[key]:!p.checklist[key]};
   updL(pid,{checklist:nc});renderMain();renderSidebar();
-  await db.from("patients").update({checklist:nc,updated_at:new Date().toISOString()}).eq("id",pid);
+  const {error}=await db.from("patients").update({checklist:nc,updated_at:new Date().toISOString()}).eq("id",pid);
+  if(error){
+    const rollback={...p.checklist};
+    updL(pid,{checklist:rollback});renderMain();renderSidebar();
+    toast("Failed to update checklist: "+error.message,"#dc2626");
+  }
 }
 
 async function togFlag(pid,flag){
@@ -1078,12 +1083,13 @@ async function subPat(eid){
     const {error}=await db.from("patients").update({room,mrn,name,primary_pt:primaryPt,primary_ot:primaryOt,primary_slp:primarySlp,classification:cls,high_priority:hp,is_urgent:isUrgent,ward,updated_at:new Date().toISOString()}).eq("id",editId);
     noloader();if(error){toast("Failed: "+error.message,"#dc2626");return;}
     updL(editId,{room,mrn,name,primaryPt,primaryOt,primarySlp,classification:cls,highPriority:hp,isUrgent,ward});
+    closeModal();render();toast("Patient updated ✓","#16a34a");
   }else{
     const {data,error}=await db.from("patients").insert({room,mrn,name,primary_pt:primaryPt,primary_ot:primaryOt,primary_slp:primarySlp,classification:cls,high_priority:hp,is_urgent:isUrgent,ward,checklist:DEF_CHK,equip_others:""}).select().single();
     noloader();if(error){toast("Failed: "+error.message,"#dc2626");return;}
     S.patients.push(p2l(data,{}));S.selected=data.id;
+    closeModal();render();toast("Patient added ✓","#16a34a");
   }
-  closeModal();render();
 }
 
 function openArcConfirm(id){
@@ -1111,10 +1117,11 @@ function openDelConfirm(id){
 async function permDel(id){
   const p=S.patients.find(x=>x.id===id);if(!p)return;
   loader("Deleting…");
-  await db.from("patients").delete().eq("id",id);
+  const {error}=await db.from("patients").delete().eq("id",id);
   noloader();
+  if(error){toast("Failed to delete: "+error.message,"#dc2626");return;}
   S.patients=S.patients.filter(x=>x.id!==id);
-  if(S.selected===id)S.selected=S.patients[0]?.id??null;
+  if(S.selected===id)S.selected=S.patients.length?S.patients[0].id:null;
   closeModal();render();toast(`${p.name} permanently deleted.`,"#dc2626");
 }
 
@@ -1128,8 +1135,9 @@ function renderArcModal(q){
 async function restorePat(id){
   if(!canManagePatients()){toast("You don't have permission to restore patients.","#dc2626");return;}
   loader("Restoring…");
-  await db.from("patients").update({is_archived:false,archived_at:null}).eq("id",id);
+  const {error}=await db.from("patients").update({is_archived:false,archived_at:null}).eq("id",id);
   noloader();
+  if(error){toast("Failed to restore: "+error.message,"#dc2626");return;}
   const p=S.archive.find(x=>x.id===id);if(!p)return;
   const {archivedAt,...patient}=p;
   S.patients.push(patient);S.archive=S.archive.filter(x=>x.id!==id);
@@ -1150,7 +1158,10 @@ async function openAdminPanel(){
   noloader();
   if(error){toast("Failed to load users: "+error.message,"#dc2626");return;}
 
-  const all=users||[];
+  const all=(users||[]).slice().sort((a,b)=>{
+    const order={pending:0,user:1,admin_officer:2,admin:3};
+    return (order[a.role]??9)-(order[b.role]??9);
+  });
   const pending=all.filter(u=>u.role==="pending");
   const fmtDate=iso=>{if(!iso)return"—";return new Date(iso).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});};
 
@@ -1201,7 +1212,7 @@ async function openAdminPanel(){
     <div style="overflow:auto;max-height:60vh;">
       <table class="user-table">
         <thead><tr><th>Name</th><th>Role</th><th>Joined</th><th>Actions</th></tr></thead>
-        <tbody>${rows||`<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--fa)">No users found.</td></tr>`}</tbody>
+        <tbody>${rows.length?rows:`<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--fa)">No users found.</td></tr>`}</tbody>
       </table>
     </div>
   `,false,true);
