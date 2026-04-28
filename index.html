@@ -545,17 +545,30 @@ async function onLogin(user){
   currentUser=user;
   currentName=user.user_metadata?.full_name||user.email.split("@")[0];
 
-  // Fetch role
-  const {data:roleRow}=await db.from("user_roles").select("role,full_name").eq("user_id",user.id).maybeSingle();
+  // Fetch role — use error to distinguish "no row" from "RLS/network failure"
+  const {data:roleRow,error:roleErr}=await db.from("user_roles").select("role,full_name").eq("user_id",user.id).maybeSingle();
+
   if(roleRow){
+    // Row found — use it
     currentRole=roleRow.role||"pending";
     if(roleRow.full_name)currentName=roleRow.full_name;
+  }else if(roleErr){
+    // Query failed (RLS or network) — don't assume pending, show error
+    await db.auth.signOut();
+    const err=document.getElementById("login-err");
+    if(err)err.textContent="Could not verify your account. Please try again. ("+roleErr.message+")";
+    const btn=document.getElementById("login-btn");
+    if(btn){btn.disabled=false;btn.textContent="Sign In";}
+    return;
   }else{
-    // No role row — insert as pending
-    await db.from("user_roles").upsert(
-      {user_id:user.id,role:"pending",full_name:currentName},
-      {onConflict:"user_id"}
+    // Truly no row exists — this is a brand new user, insert as pending
+    const {error:insertErr}=await db.from("user_roles").insert(
+      {user_id:user.id,role:"pending",full_name:currentName}
     );
+    if(insertErr){
+      // Insert also failed — likely RLS; don't block, just warn
+      console.warn("Could not create role row:",insertErr.message);
+    }
     currentRole="pending";
   }
 
