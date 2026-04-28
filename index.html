@@ -351,6 +351,7 @@ input,select,textarea{font-family:var(--font);}
     </div>
     <div class="hdr-actions">
       <button class="hdr-btn" onclick="openArchiveModal()">🗄️ Archive <span class="badge" id="arc-count" style="display:none"></span></button>
+      <button class="hdr-btn" id="hdr-privacy-btn" onclick="togPrivacy()" title="Toggle patient confidentiality mode">🔓 Privacy</button>
       <button class="hdr-btn" id="hdr-admin-btn" onclick="openAdminPanel()" style="display:none">👑 Users</button>
       <span class="hdr-date" id="hdr-date"></span>
       <span id="hdr-role-badge" style="font-size:10px;font-weight:700;border-radius:20px;padding:3px 10px;"></span>
@@ -416,6 +417,33 @@ const esc=s=>String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>
 const fmt=iso=>{if(!iso)return"—";try{return new Date(iso).toLocaleString("en-US",{month:"short",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit",hour12:true});}catch{return"—";}};
 const wkey=w=>w.toLowerCase().replace(/\s+/g,"");
 const wbc=w=>`wbadge wbadge-${wkey(w||"Ward A")}`;
+
+// ── PRIVACY MODE ──────────────────────────────────────────────
+let privacyMode=false;
+function maskName(name){
+  if(!privacyMode||!name)return name||"";
+  const parts=name.trim().split(/\s+/);
+  if(parts.length===1)return parts[0]; // single word — show as-is
+  // Show first name only, mask the rest with •••
+  return parts[0]+" "+"•".repeat(Math.max(3,parts.slice(1).join(" ").length));
+}
+function maskMRN(mrn){
+  if(!privacyMode||!mrn)return mrn||"";
+  const s=String(mrn);
+  if(s.length<=2)return s;
+  return "•".repeat(s.length-2)+s.slice(-2);
+}
+function togPrivacy(){
+  privacyMode=!privacyMode;
+  const btn=document.getElementById("hdr-privacy-btn");
+  if(btn){
+    btn.textContent=privacyMode?"🔒 Privacy":"🔓 Privacy";
+    btn.style.background=privacyMode?"rgba(220,38,38,0.35)":"rgba(255,255,255,0.12)";
+    btn.style.borderColor=privacyMode?"rgba(220,38,38,0.7)":"rgba(255,255,255,0.35)";
+  }
+  renderSidebar();renderMain();
+  toast(privacyMode?"🔒 Privacy mode ON — names & MRNs masked":"🔓 Privacy mode OFF","#475569");
+}
 let _tt;
 function toast(msg,color="#9b2335"){const e=document.getElementById("toast");e.textContent=msg;e.style.background=color;e.style.display="block";clearTimeout(_tt);_tt=setTimeout(()=>e.style.display="none",3500);}
 function loader(msg){document.getElementById("loader-msg").textContent=msg||"Loading…";document.getElementById("loader").classList.add("visible");}
@@ -638,8 +666,8 @@ function renderSidebar(){
         </div>
         <span class="cls-badge cls-${p.classification}">${p.classification}</span>
       </div>
-      <div class="row-name">${esc(p.name||"Room "+p.room)}</div>
-      <div class="row-mrn">${esc(p.mrn)}</div>
+      <div class="row-name">${esc(maskName(p.name||"Room "+p.room))}</div>
+      <div class="row-mrn">${esc(maskMRN(p.mrn))}</div>
       <div class="row-bot">
         <span class="row-pt">${esc(p.primaryPt||"")}</span>
         <span class="row-done${done>=2?" complete":""}">${done}/11</span>
@@ -673,6 +701,7 @@ function renderMain(){
     main.innerHTML=`<div class="empty-main" style="display:flex"><div class="big-icon" style="font-size:48px">🏥</div><p style="font-size:15px;color:var(--mu)">No patients yet.</p>${canManagePatients()?`<button class="btn-primary" style="flex:none;padding:10px 22px;border-radius:10px" onclick="openAddModal()">+ Add First Patient</button>`:""}</div>`;
     return;
   }
+  const displayName=maskName(p.name||"Room "+p.room);
   const ini=p.name?p.name.split(" ").map(n=>n[0]||"").filter(Boolean).join("").slice(0,2).toUpperCase():p.room||"?";
   main.innerHTML=`
   <div class="pat-card">
@@ -680,12 +709,12 @@ function renderMain(){
       <div class="pat-avatar">${esc(ini)}</div>
       <div>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          <span class="pat-fullname">${esc(p.name||"Room "+p.room)}</span>
+          <span class="pat-fullname">${esc(maskName(p.name||"Room "+p.room))}</span>
           ${p.isUrgent?'<span class="urg-badge">🔴 URGENT</span>':""}
           ${p.highPriority?'<span class="pri-badge">🚩 PRIORITY</span>':""}
         </div>
         <div class="pat-meta">
-          <span>Room ${esc(p.room)}</span><span>${esc(p.mrn)}</span>
+          <span>Room ${esc(p.room)}</span><span>${esc(maskMRN(p.mrn))}</span>
           ${p.primaryPt?`<span>🦵 PT: ${esc(p.primaryPt)}</span>`:""}
           ${p.primaryOt?`<span>🖐️ OT: ${esc(p.primaryOt)}</span>`:""}
           ${p.primarySlp?`<span>🗣️ SLP: ${esc(p.primarySlp)}</span>`:""}
@@ -1136,7 +1165,7 @@ function openArchiveModal(){renderArcModal("");}
 function renderArcModal(q){
   const res=S.archive.filter(p=>p.name.toLowerCase().includes(q.toLowerCase())||p.mrn.toLowerCase().includes(q.toLowerCase()));
   const rows=res.length===0?`<div class="arc-empty">${S.archive.length===0?"No archived patients yet.":"No matches found."}</div>`
-    :res.map(p=>`<div class="arc-row"><div><div class="arc-name">${esc(p.name)}</div><div class="arc-meta">${esc(p.mrn)} · Room ${esc(p.room)} · PT: ${esc(p.primaryPt||"—")}</div><div class="arc-ts">Archived ${p.archivedAt?fmt(p.archivedAt):""}</div></div>${canManagePatients()?`<button class="btn-restore" onclick="restorePat('${p.id}')">Restore</button>`:""}</div>`).join("");
+    :res.map(p=>`<div class="arc-row"><div><div class="arc-name">${esc(maskName(p.name||"Room "+p.room))}</div><div class="arc-meta">${esc(maskMRN(p.mrn))} · Room ${esc(p.room)} · PT: ${esc(p.primaryPt||"—")}</div><div class="arc-ts">Archived ${p.archivedAt?fmt(p.archivedAt):""}</div></div>${canManagePatients()?`<button class="btn-restore" onclick="restorePat('${p.id}')">Restore</button>`:""}</div>`).join("");
   showModal(`<div class="modal-head"><span class="modal-title">🗄️ Patient Archive</span><button class="modal-close" onclick="closeModal()">×</button></div><div class="arc-search"><input class="fi" autofocus placeholder="Search by name or MRN…" value="${esc(q)}" oninput="renderArcModal(this.value)" style="font-size:14px"/></div><div class="arc-list modal-body scroll" style="padding:0">${rows}</div>`,false,true);
 }
 async function restorePat(id){
