@@ -408,10 +408,10 @@ const canManagePatients = ()=>["admin","admin_officer"].includes(currentRole);
 const canDeletePatients = ()=>currentRole==="admin";
 const canManageUsers    = ()=>currentRole==="admin";
 const canWriteNotes     = ()=>["admin","admin_officer","user"].includes(currentRole);
-const collapsed = new Set();
+const collapsed = new Set(["__urg__","__pri__","Ward A","Ward B","ICU 1","ICU 2"]);
 
 function initCollapsed(){
-  // Collapse all groups by default
+  collapsed.clear();
   collapsed.add("__urg__");
   collapsed.add("__pri__");
   WARDS.forEach(w=>collapsed.add(w.id));
@@ -632,9 +632,8 @@ async function loadAll(){
   if(!S.selected||!ids.includes(S.selected)){
     S.selected=S.patients.length?S.patients[0].id:null;
   }
-  // Collapse all groups, then expand only the selected patient's group
+  // Collapse all groups on every load
   initCollapsed();
-  if(S.selected)expandPatientGroup(S.selected);
 }
 const p2l=(p,nm)=>({
   id:p.id,room:p.room,name:p.name,mrn:p.mrn,
@@ -900,6 +899,7 @@ function rNS(p,type,icon,title,placeholder,replies){
 //  ACTIONS
 // ═══════════════════════════════════════
 function selPat(id){S.selected=id;expandPatientGroup(id);renderSidebar();renderMain();}
+function autoSelPat(id){S.selected=id;renderSidebar();renderMain();} // used on load — no expand
 function onSearch(v){S.search=v;renderSidebar();}
 function togWard(id){if(collapsed.has(id))collapsed.delete(id);else collapsed.add(id);renderSidebar();}
 
