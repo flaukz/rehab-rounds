@@ -631,7 +631,7 @@ function renderSidebar(){
         </div>
         <span class="cls-badge cls-${p.classification}">${p.classification}</span>
       </div>
-      <div class="row-name">${esc(p.name)}</div>
+      <div class="row-name">${esc(p.name||"Room "+p.room)}</div>
       <div class="row-mrn">${esc(p.mrn)}</div>
       <div class="row-bot">
         <span class="row-pt">${esc(p.primaryPt||"")}</span>
@@ -666,14 +666,14 @@ function renderMain(){
     main.innerHTML=`<div class="empty-main" style="display:flex"><div class="big-icon" style="font-size:48px">🏥</div><p style="font-size:15px;color:var(--mu)">No patients yet.</p>${canManagePatients()?`<button class="btn-primary" style="flex:none;padding:10px 22px;border-radius:10px" onclick="openAddModal()">+ Add First Patient</button>`:""}</div>`;
     return;
   }
-  const ini=p.name?p.name.split(" ").map(n=>n[0]||"").filter(Boolean).join("").slice(0,2).toUpperCase():"?";
+  const ini=p.name?p.name.split(" ").map(n=>n[0]||"").filter(Boolean).join("").slice(0,2).toUpperCase():p.room||"?";
   main.innerHTML=`
   <div class="pat-card">
     <div class="pat-card-l">
       <div class="pat-avatar">${esc(ini)}</div>
       <div>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          <span class="pat-fullname">${esc(p.name)}</span>
+          <span class="pat-fullname">${esc(p.name||"Room "+p.room)}</span>
           ${p.isUrgent?'<span class="urg-badge">🔴 URGENT</span>':""}
           ${p.highPriority?'<span class="pri-badge">🚩 PRIORITY</span>':""}
         </div>
@@ -1038,7 +1038,7 @@ function patForm(p){
   return `<div class="modal-head"><span class="modal-title">${ie?"✏️ Edit Patient":"➕ Add Patient"}</span><button class="modal-close" onclick="closeModal()">×</button></div>
   <div class="modal-body">
     <div class="g2">
-      <div><label class="fl">Room #</label><input class="fi" id="fr" value="${esc(v.room)}" placeholder="e.g. 101A"/></div>
+      <div><label class="fl">Room # <span style="color:#dc2626">*</span></label><input class="fi" id="fr" value="${esc(v.room)}" placeholder="e.g. 101A"/></div>
       <div><label class="fl">MRN</label><input class="fi" id="fm" value="${esc(v.mrn)}" placeholder="e.g. MRN-001234"/></div>
     </div>
     <div><label class="fl">Patient Name</label><input class="fi" id="fn" value="${esc(v.name)}" placeholder="Full name"/></div>
@@ -1075,7 +1075,7 @@ async function subPat(eid){
   const primaryPt=document.getElementById("fpt").value.trim(),primaryOt=document.getElementById("fot").value.trim(),primarySlp=document.getElementById("fslp").value.trim();
   const cls=document.getElementById("fc").value,ward=document.getElementById("fw").value;
   const hp=document.getElementById("fp").value==="1",isUrgent=document.getElementById("fu").value==="1";
-  if(!room||!mrn||!name){toast("Please fill in Room, MRN and Patient Name.","#dc2626");return;}
+  if(!room){toast("Room number is required.","#dc2626");return;}
   // eid is passed as a string from onclick — convert "null" string to actual null
   const editId=(eid===null||eid==="null")?null:eid;
   loader(editId?"Saving…":"Adding…");
