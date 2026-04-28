@@ -105,8 +105,10 @@ input,select,textarea{font-family:var(--font);}
 .utoggle.on{border-color:#dc2626;background:#dc2626;color:#fff;}
 
 /* PATIENT ROWS */
-.pat-row{padding:11px 14px;border-left:3px solid transparent;cursor:pointer;border-bottom:1px solid #f0e4e6;background:var(--sidebar);transition:background 0.12s;position:relative;}
+.pat-row{padding:11px 14px;border-left:3px solid transparent;cursor:pointer;border-bottom:1px solid #f0e4e6;background:#fff;transition:background 0.12s;position:relative;}
+.pat-row:nth-child(even){background:#fdf4f5;}
 .pat-row:hover{background:#fae8ea;}
+.pat-row:nth-child(even):hover{background:#fae8ea;}
 .pat-row.active{background:var(--soft)!important;border-left-color:var(--mid)!important;}
 .row-top{display:flex;justify-content:space-between;align-items:flex-start;}
 .row-room{font-size:11px;font-weight:700;color:var(--mid);background:var(--soft);border-radius:5px;padding:1px 6px;}
@@ -915,8 +917,16 @@ async function togChk(pid,key){
   const p=S.patients.find(x=>x.id===pid);if(!p)return;
   const nc={...p.checklist,[key]:!p.checklist[key]};
   updL(pid,{checklist:nc});
-  // If marking unstable ON, auto-expand the unstable group
-  if(key==="unstable"&&nc.unstable)collapsed.delete("__unst__");
+  if(key==="unstable"){
+    if(nc.unstable){
+      // Turned ON — expand
+      collapsed.delete("__unst__");
+    } else {
+      // Turned OFF — collapse if no others remain
+      const stillUnstable=S.patients.filter(x=>x.id!==pid).some(x=>x.checklist?.unstable);
+      if(!stillUnstable)collapsed.add("__unst__");
+    }
+  }
   renderMain();renderSidebar();
   const {error}=await db.from("patients").update({checklist:nc,updated_at:new Date().toISOString()}).eq("id",pid);
   if(error){
@@ -932,11 +942,16 @@ async function togFlag(pid,flag){
   const newVal=isPriority?!p.highPriority:!p.isUrgent;
   const dbField=isPriority?"high_priority":"is_urgent";
   const localField=isPriority?"highPriority":"isUrgent";
+  const groupKey=isPriority?"__pri__":"__urg__";
   updL(pid,{[localField]:newVal});
-  // If turning a flag ON, ensure that group is visible in sidebar
   if(newVal){
-    if(isPriority)collapsed.delete("__pri__");
-    else collapsed.delete("__urg__");
+    // Flag turned ON — expand its group
+    collapsed.delete(groupKey);
+  } else {
+    // Flag turned OFF — check if that group is now empty; if so collapse it
+    const updated=S.patients.find(x=>x.id===pid);
+    const stillInGroup=S.patients.filter(x=>x.id!==pid).some(x=>isPriority?x.highPriority:x.isUrgent);
+    if(!stillInGroup)collapsed.add(groupKey);
   }
   renderMain();renderSidebar();
   const {error}=await db.from("patients").update({[dbField]:newVal,updated_at:new Date().toISOString()}).eq("id",pid);
