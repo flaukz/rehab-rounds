@@ -1,0 +1,18 @@
+{
+  "name": "Salma Rahba – Hospital Rounding System",
+  "short_name": "Rounding",
+  "description": "Hospital Rounding System for Salma Rahba Rehabilitation Medicine",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#7b1f2e",
+  "theme_color": "#7b1f2e",
+  "orientation": "landscape",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='80' fill='%237b1f2e'/><text y='330' x='256' font-size='300' text-anchor='middle'>🏥</text></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

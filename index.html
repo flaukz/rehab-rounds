@@ -3,7 +3,14 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Salma Rahba Rehabilitation Medicine – Hospital Rounding System</title>
+<title>Salma Rahba – Rounding System</title>
+<meta name="description" content="Hospital Rounding System – Salma Rahba Rehabilitation Medicine"/>
+<meta name="theme-color" content="#7b1f2e"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Rounding"/>
+<link rel="manifest" href="manifest.json"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.min.js"></script>
@@ -1250,6 +1257,17 @@ async function confirmReject(userId){
   if(error){toast("Failed: "+error.message,"#dc2626");return;}
   toast("User rejected and removed.","#dc2626");
   openAdminPanel();
+}
+
+// ═══════════════════════════════════════
+//  PWA SERVICE WORKER
+// ═══════════════════════════════════════
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('sw.js')
+      .then(()=>console.log('SW registered'))
+      .catch(e=>console.log('SW error:',e));
+  });
 }
 </script>
 </body>
