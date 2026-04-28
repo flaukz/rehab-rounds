@@ -661,9 +661,12 @@ function renderHdr(){
 
 function renderSidebar(){
   const q=S.search.toLowerCase();
-  const filt=S.patients.filter(p=>p.name.toLowerCase().includes(q)||p.room.toLowerCase().includes(q)||p.mrn.toLowerCase().includes(q)||(p.ward||"").toLowerCase().includes(q));
-  const hpC=S.patients.filter(p=>p.highPriority).length;
-  const urgC=S.patients.filter(p=>p.isUrgent).length;
+  const filt=S.patients.filter(p=>{
+    const n=(p.name||"").toLowerCase(),r=(p.room||"").toLowerCase(),m=(p.mrn||"").toLowerCase(),w=(p.ward||"").toLowerCase();
+    return n.includes(q)||r.includes(q)||m.includes(q)||w.includes(q);
+  });
+  const urgC=filt.filter(p=>p.isUrgent).length;
+  const hpC=filt.filter(p=>p.highPriority).length;
 
   const buildRow=p=>{
     const isAct=p.id===S.selected;
@@ -718,7 +721,6 @@ function renderMain(){
     main.innerHTML=`<div class="empty-main" style="display:flex"><div class="big-icon" style="font-size:48px">🏥</div><p style="font-size:15px;color:var(--mu)">No patients yet.</p>${canManagePatients()?`<button class="btn-primary" style="flex:none;padding:10px 22px;border-radius:10px" onclick="openAddModal()">+ Add First Patient</button>`:""}</div>`;
     return;
   }
-  const displayName=maskName(p.name||"Room "+p.room);
   const ini=p.name?p.name.split(" ").map(n=>n[0]||"").filter(Boolean).join("").slice(0,2).toUpperCase():p.room||"?";
   main.innerHTML=`
   <div class="pat-card">
@@ -899,7 +901,6 @@ function rNS(p,type,icon,title,placeholder,replies){
 //  ACTIONS
 // ═══════════════════════════════════════
 function selPat(id){S.selected=id;expandPatientGroup(id);renderSidebar();renderMain();}
-function autoSelPat(id){S.selected=id;renderSidebar();renderMain();} // used on load — no expand
 function onSearch(v){S.search=v;renderSidebar();}
 function togWard(id){if(collapsed.has(id))collapsed.delete(id);else collapsed.add(id);renderSidebar();}
 
@@ -921,10 +922,15 @@ async function togFlag(pid,flag){
   const newVal=isPriority?!p.highPriority:!p.isUrgent;
   const dbField=isPriority?"high_priority":"is_urgent";
   const localField=isPriority?"highPriority":"isUrgent";
-  updL(pid,{[localField]:newVal});renderMain();renderSidebar();
+  updL(pid,{[localField]:newVal});
+  // If turning a flag ON, ensure that group is visible in sidebar
+  if(newVal){
+    if(isPriority)collapsed.delete("__pri__");
+    else collapsed.delete("__urg__");
+  }
+  renderMain();renderSidebar();
   const {error}=await db.from("patients").update({[dbField]:newVal,updated_at:new Date().toISOString()}).eq("id",pid);
   if(error){
-    // Roll back on failure
     updL(pid,{[localField]:!newVal});renderMain();renderSidebar();
     toast("Failed to update flag: "+error.message,"#dc2626");
   }
@@ -1142,6 +1148,7 @@ async function subPat(eid){
     const {data,error}=await db.from("patients").insert({room,mrn,name,primary_pt:primaryPt,primary_ot:primaryOt,primary_slp:primarySlp,classification:cls,high_priority:hp,is_urgent:isUrgent,ward,checklist:DEF_CHK,equip_others:""}).select().single();
     noloader();if(error){toast("Failed: "+error.message,"#dc2626");return;}
     S.patients.push(p2l(data,{}));S.selected=data.id;
+    expandPatientGroup(data.id);
     closeModal();render();toast("Patient added ✓","#16a34a");
   }
 }
@@ -1149,7 +1156,8 @@ async function subPat(eid){
 function openArcConfirm(id){
   if(!canManagePatients()){toast("You don't have permission to archive patients.","#dc2626");return;}
   const p=S.patients.find(x=>x.id===id);if(!p)return;
-  showModal(`<div class="confirm-box"><div class="conf-icon">🗄️</div><div class="conf-title">Archive Patient?</div><div class="conf-msg"><strong>${esc(p.name)}</strong> (Room ${esc(p.room)}) will be moved to the archive.</div><div class="conf-sub">Restore later by name or MRN.</div><div class="modal-acts" style="width:100%"><button class="btn-cancel" onclick="closeModal()">Cancel</button><button class="btn-danger" onclick="arcPat('${id}')">Archive</button></div></div>`);
+  const label=p.name||"Room "+p.room;
+  showModal(`<div class="confirm-box"><div class="conf-icon">🗄️</div><div class="conf-title">Archive Patient?</div><div class="conf-msg"><strong>${esc(label)}</strong> (Room ${esc(p.room)}) will be moved to the archive.</div><div class="conf-sub">Restore later by name or MRN.</div><div class="modal-acts" style="width:100%"><button class="btn-cancel" onclick="closeModal()">Cancel</button><button class="btn-danger" onclick="arcPat('${id}')">Archive</button></div></div>`);
 }
 async function arcPat(id){
   const p=S.patients.find(x=>x.id===id);if(!p)return;
@@ -1160,13 +1168,14 @@ async function arcPat(id){
   S.archive.push({...p,archivedAt:new Date().toISOString()});
   S.patients=S.patients.filter(x=>x.id!==id);
   S.selected=S.patients.length?S.patients[0].id:null;
-  closeModal();render();toast(`${p.name} archived.`,"#7c3aed");
+  closeModal();render();toast(`${p.name||"Room "+p.room} archived.`,"#7c3aed");
 }
 
 function openDelConfirm(id){
   if(!canDeletePatients()){toast("Only admins can permanently delete patients.","#dc2626");return;}
   const p=S.patients.find(x=>x.id===id);if(!p)return;
-  showModal(`<div class="confirm-box"><div class="conf-icon">🗑️</div><div class="conf-title">Delete Patient?</div><div class="conf-msg"><strong>${esc(p.name)}</strong> will be <strong>permanently deleted</strong>.</div><div class="conf-sub">Cannot be undone. All notes and history will be lost.</div><div class="modal-acts" style="width:100%"><button class="btn-cancel" onclick="closeModal()">Cancel</button><button class="btn-danger" onclick="permDel('${id}')">Delete Permanently</button></div></div>`);
+  const label=p.name||"Room "+p.room;
+  showModal(`<div class="confirm-box"><div class="conf-icon">🗑️</div><div class="conf-title">Delete Patient?</div><div class="conf-msg"><strong>${esc(label)}</strong> will be <strong>permanently deleted</strong>.</div><div class="conf-sub">Cannot be undone. All notes and history will be lost.</div><div class="modal-acts" style="width:100%"><button class="btn-cancel" onclick="closeModal()">Cancel</button><button class="btn-danger" onclick="permDel('${id}')">Delete Permanently</button></div></div>`);
 }
 async function permDel(id){
   const p=S.patients.find(x=>x.id===id);if(!p)return;
@@ -1176,12 +1185,12 @@ async function permDel(id){
   if(error){toast("Failed to delete: "+error.message,"#dc2626");return;}
   S.patients=S.patients.filter(x=>x.id!==id);
   if(S.selected===id)S.selected=S.patients.length?S.patients[0].id:null;
-  closeModal();render();toast(`${p.name} permanently deleted.`,"#dc2626");
+  closeModal();render();toast(`${p.name||"Room "+p.room} permanently deleted.`,"#dc2626");
 }
 
 function openArchiveModal(){renderArcModal("");}
 function renderArcModal(q){
-  const res=S.archive.filter(p=>p.name.toLowerCase().includes(q.toLowerCase())||p.mrn.toLowerCase().includes(q.toLowerCase()));
+  const res=S.archive.filter(p=>(p.name||"").toLowerCase().includes(q.toLowerCase())||(p.mrn||"").toLowerCase().includes(q.toLowerCase()));
   const rows=res.length===0?`<div class="arc-empty">${S.archive.length===0?"No archived patients yet.":"No matches found."}</div>`
     :res.map(p=>`<div class="arc-row"><div><div class="arc-name">${esc(maskName(p.name||"Room "+p.room))}</div><div class="arc-meta">${esc(maskMRN(p.mrn))} · Room ${esc(p.room)} · PT: ${esc(p.primaryPt||"—")}</div><div class="arc-ts">Archived ${p.archivedAt?fmt(p.archivedAt):""}</div></div>${canManagePatients()?`<button class="btn-restore" onclick="restorePat('${p.id}')">Restore</button>`:""}</div>`).join("");
   showModal(`<div class="modal-head"><span class="modal-title">🗄️ Patient Archive</span><button class="modal-close" onclick="closeModal()">×</button></div><div class="arc-search"><input class="fi" autofocus placeholder="Search by name or MRN…" value="${esc(q)}" oninput="renderArcModal(this.value)" style="font-size:14px"/></div><div class="arc-list modal-body scroll" style="padding:0">${rows}</div>`,false,true);
@@ -1196,7 +1205,7 @@ async function restorePat(id){
   const {archivedAt,...patient}=p;
   S.patients.push(patient);S.archive=S.archive.filter(x=>x.id!==id);
   S.selected=patient.id;
-  closeModal();render();toast(`${patient.name} restored ✓`,"#16a34a");
+  closeModal();render();toast(`${patient.name||"Room "+patient.room} restored ✓`,"#16a34a");
 }
 
 // ═══════════════════════════════════════
