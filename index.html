@@ -94,6 +94,9 @@ input,select,textarea{font-family:var(--font);}
 .urg-section{border-bottom:2px solid #fca5a5;}
 .urg-hdr{background:linear-gradient(90deg,#fff1f1,#fdf7f7)!important;}
 .urg-hdr:hover{background:#fee2e2!important;}
+.unst-section{border-bottom:2px solid #fcd34d;}
+.unst-hdr{background:linear-gradient(90deg,#fffbeb,#fdf7f7)!important;}
+.unst-hdr:hover{background:#fef3c7!important;}
 .urg-badge{font-size:11px;font-weight:700;background:#dc2626;color:#fff;border-radius:6px;padding:2px 8px;}
 .pri-badge{font-size:11px;font-weight:700;background:#fee2e2;color:#dc2626;border-radius:6px;padding:2px 8px;}
 .ptoggle{width:100%;padding:8px 11px;border-radius:8px;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;border:1.5px solid #edcacf;background:#fdf8f8;color:#b08088;cursor:pointer;transition:all 0.15s;}
@@ -408,20 +411,21 @@ const canManagePatients = ()=>["admin","admin_officer"].includes(currentRole);
 const canDeletePatients = ()=>currentRole==="admin";
 const canManageUsers    = ()=>currentRole==="admin";
 const canWriteNotes     = ()=>["admin","admin_officer","user"].includes(currentRole);
-const collapsed = new Set(["__urg__","__pri__","Ward A","Ward B","ICU 1","ICU 2"]);
+const collapsed = new Set(["__urg__","__pri__","__unst__","Ward A","Ward B","ICU 1","ICU 2"]);
 
 function initCollapsed(){
   collapsed.clear();
   collapsed.add("__urg__");
   collapsed.add("__pri__");
+  collapsed.add("__unst__");
   WARDS.forEach(w=>collapsed.add(w.id));
 }
 
 function expandPatientGroup(pid){
-  // Expand the group containing the selected patient
   const p=S.patients.find(x=>x.id===pid);if(!p)return;
   if(p.isUrgent){collapsed.delete("__urg__");return;}
   if(p.highPriority){collapsed.delete("__pri__");return;}
+  if(p.checklist?.unstable){collapsed.delete("__unst__");return;}
   collapsed.delete(p.ward||"Ward A");
 }
 
@@ -667,6 +671,7 @@ function renderSidebar(){
   });
   const urgC=filt.filter(p=>p.isUrgent).length;
   const hpC=filt.filter(p=>p.highPriority).length;
+  const unstC=filt.filter(p=>p.checklist?.unstable).length;
 
   const buildRow=p=>{
     const isAct=p.id===S.selected;
@@ -702,6 +707,8 @@ function renderSidebar(){
   if(urgP.length>0){const c=collapsed.has("__urg__");html+=`<div class="ward-section urg-section"><button class="ward-hdr urg-hdr" onclick="togWard('__urg__')"><span>🔴</span><span class="ward-name" style="color:#dc2626">Urgent</span><span class="ward-cnt" style="background:#fee2e2;color:#991b1b">${urgP.length}</span><span class="ward-chev">${c?"▶":"▼"}</span></button><div class="ward-pats${c?" collapsed":""}">${urgP.map(buildRow).join("")}</div></div>`;}
   const priP=sortR(filt.filter(p=>p.highPriority));
   if(priP.length>0){const c=collapsed.has("__pri__");html+=`<div class="ward-section pri-section"><button class="ward-hdr pri-hdr" onclick="togWard('__pri__')"><span>🚩</span><span class="ward-name" style="color:#9b2335">Priority</span><span class="ward-cnt" style="background:#fad5d9;color:#7b1f2e">${priP.length}</span><span class="ward-chev">${c?"▶":"▼"}</span></button><div class="ward-pats${c?" collapsed":""}">${priP.map(buildRow).join("")}</div></div>`;}
+  const unstP=sortR(filt.filter(p=>p.checklist?.unstable));
+  if(unstP.length>0){const c=collapsed.has("__unst__");html+=`<div class="ward-section unst-section"><button class="ward-hdr unst-hdr" onclick="togWard('__unst__')"><span>⚠️</span><span class="ward-name" style="color:#d97706">Unstable</span><span class="ward-cnt" style="background:#fef3c7;color:#92400e">${unstP.length}</span><span class="ward-chev">${c?"▶":"▼"}</span></button><div class="ward-pats${c?" collapsed":""}">${unstP.map(buildRow).join("")}</div></div>`;}
   WARDS.forEach(w=>{
     const wp=sortR(filt.filter(p=>(p.ward||"Ward A")===w.id));
     const c=collapsed.has(w.id);
@@ -711,7 +718,7 @@ function renderSidebar(){
     </div></div>`;
   });
   document.getElementById("patient-list").innerHTML=html||`<div class="empty-list">No patients found.</div>`;
-  document.getElementById("sidebar-foot").textContent=`${filt.length} patient${filt.length!==1?"s":""} · ${urgC} urgent · ${hpC} priority`;
+  document.getElementById("sidebar-foot").textContent=`${filt.length} patient${filt.length!==1?"s":""} · ${urgC} urgent · ${hpC} priority · ${unstC} unstable`;
 }
 
 function renderMain(){
@@ -907,7 +914,10 @@ function togWard(id){if(collapsed.has(id))collapsed.delete(id);else collapsed.ad
 async function togChk(pid,key){
   const p=S.patients.find(x=>x.id===pid);if(!p)return;
   const nc={...p.checklist,[key]:!p.checklist[key]};
-  updL(pid,{checklist:nc});renderMain();renderSidebar();
+  updL(pid,{checklist:nc});
+  // If marking unstable ON, auto-expand the unstable group
+  if(key==="unstable"&&nc.unstable)collapsed.delete("__unst__");
+  renderMain();renderSidebar();
   const {error}=await db.from("patients").update({checklist:nc,updated_at:new Date().toISOString()}).eq("id",pid);
   if(error){
     const rollback={...p.checklist};
