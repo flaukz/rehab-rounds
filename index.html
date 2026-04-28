@@ -410,6 +410,21 @@ const canManageUsers    = ()=>currentRole==="admin";
 const canWriteNotes     = ()=>["admin","admin_officer","user"].includes(currentRole);
 const collapsed = new Set();
 
+function initCollapsed(){
+  // Collapse all groups by default
+  collapsed.add("__urg__");
+  collapsed.add("__pri__");
+  WARDS.forEach(w=>collapsed.add(w.id));
+}
+
+function expandPatientGroup(pid){
+  // Expand the group containing the selected patient
+  const p=S.patients.find(x=>x.id===pid);if(!p)return;
+  if(p.isUrgent){collapsed.delete("__urg__");return;}
+  if(p.highPriority){collapsed.delete("__pri__");return;}
+  collapsed.delete(p.ward||"Ward A");
+}
+
 // ═══════════════════════════════════════
 //  UTILS
 // ═══════════════════════════════════════
@@ -617,6 +632,9 @@ async function loadAll(){
   if(!S.selected||!ids.includes(S.selected)){
     S.selected=S.patients.length?S.patients[0].id:null;
   }
+  // Collapse all groups, then expand only the selected patient's group
+  initCollapsed();
+  if(S.selected)expandPatientGroup(S.selected);
 }
 const p2l=(p,nm)=>({
   id:p.id,room:p.room,name:p.name,mrn:p.mrn,
@@ -881,7 +899,7 @@ function rNS(p,type,icon,title,placeholder,replies){
 // ═══════════════════════════════════════
 //  ACTIONS
 // ═══════════════════════════════════════
-function selPat(id){S.selected=id;renderSidebar();renderMain();}
+function selPat(id){S.selected=id;expandPatientGroup(id);renderSidebar();renderMain();}
 function onSearch(v){S.search=v;renderSidebar();}
 function togWard(id){if(collapsed.has(id))collapsed.delete(id);else collapsed.add(id);renderSidebar();}
 
