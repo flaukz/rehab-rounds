@@ -354,6 +354,7 @@ input,select,textarea{font-family:var(--font);}
     <!-- REGISTER PANEL -->
     <div id="panel-register" style="display:none">
       <div class="lf"><label>Full Name</label><input type="text" id="rn" placeholder="e.g. Dr. Juan dela Cruz"/></div>
+      <div class="lf"><label>Mobile Number (WhatsApp)</label><input type="tel" id="rph" placeholder="e.g. 971501234567"/></div>
       <div class="lf"><label>Email</label><input type="email" id="re" placeholder="your@email.com" autocomplete="email"/></div>
       <div class="lf"><label>Password (min 6 characters)</label><input type="password" id="rp" placeholder="••••••••"/></div>
       <div class="lf"><label>Confirm Password</label><input type="password" id="rp2" placeholder="••••••••" onkeydown="if(event.key==='Enter')doRegister()"/></div>
@@ -531,6 +532,7 @@ async function doLogin(){
 
 async function doRegister(){
   const name=document.getElementById("rn").value.trim();
+  const phone=(document.getElementById("rph")?.value||"").trim().replace(/\D/g,"");
   const email=document.getElementById("re").value.trim();
   const pass=document.getElementById("rp").value;
   const pass2=document.getElementById("rp2").value;
@@ -551,12 +553,11 @@ async function doRegister(){
     btn.disabled=false;btn.textContent="Create Account";
     if(error){err.textContent=error.message;return;}
     if(!data?.user){err.textContent="Something went wrong. Please try again.";return;}
-    // Insert as 'pending' — must be approved by admin before they can access the app
     await db.from("user_roles").upsert(
-      {user_id:data.user.id,role:"pending",full_name:name},
+      {user_id:data.user.id,role:"pending",full_name:name,phone},
       {onConflict:"user_id"}
     );
-    ["rn","re","rp","rp2"].forEach(id=>{const el=document.getElementById(id);if(el)el.value="";});
+    ["rn","rph","re","rp","rp2"].forEach(id=>{const el=document.getElementById(id);if(el)el.value="";});
     ok.textContent="✅ Account created! Your account is pending admin approval. You'll be able to sign in once approved.";
   }catch(e){
     btn.disabled=false;btn.textContent="Create Account";
@@ -1332,6 +1333,7 @@ async function openAdminPanel(){
     const isMe=u.user_id===currentUser?.id;
     const role=u.role||"pending";
     const pill=`<span class="role-pill ${ROLE_PILLS[role]||"rp-pending"}">${ROLE_LABELS[role]||role}</span>`;
+    const phoneDisplay=u.phone?`<div style="font-size:11px;color:var(--mu);margin-top:2px">📱 ${esc(u.phone)}</div>`:`<div style="font-size:11px;color:#ccc;margin-top:2px">No mobile</div>`;
     let actions="";
     if(isMe){
       actions=`<span style="font-size:11px;color:var(--mu);font-style:italic">You</span>`;
@@ -1353,10 +1355,16 @@ async function openAdminPanel(){
         <button class="ua-btn ua-demote" onclick="changeRole('${u.user_id}','user')">→ User</button>`;
     }
     return `<tr>
-      <td><strong>${esc(u.full_name||"—")}</strong>${isMe?' <span style="font-size:10px;color:var(--mu)">(you)</span>':""}</td>
+      <td>
+        <strong>${esc(u.full_name||"—")}</strong>${isMe?' <span style="font-size:10px;color:var(--mu)">(you)</span>':""}
+        ${phoneDisplay}
+      </td>
       <td>${pill}</td>
       <td style="font-size:11px;color:var(--fa)">${fmtDate(u.created_at)}</td>
-      <td><div style="display:flex;flex-wrap:wrap;gap:2px">${actions}</div></td>
+      <td>
+        <div style="display:flex;flex-wrap:wrap;gap:2px;margin-bottom:4px">${actions}</div>
+        <button class="ua-btn" style="border-color:#93c5fd;background:#eff6ff;color:#1d4ed8;width:100%;text-align:center" onclick="editUserPhone('${u.user_id}','${esc(u.phone||"")}','${esc(u.full_name||"")}')">📱 Edit Mobile</button>
+      </td>
     </tr>`;
   }).join("");
 
@@ -1371,7 +1379,7 @@ async function openAdminPanel(){
     </div>
     <div style="overflow:auto;max-height:60vh;">
       <table class="user-table">
-        <thead><tr><th>Name</th><th>Role</th><th>Joined</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Name & Mobile</th><th>Role</th><th>Joined</th><th>Actions</th></tr></thead>
         <tbody>${rows.length?rows:`<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--fa)">No users found.</td></tr>`}</tbody>
       </table>
     </div>
@@ -1399,6 +1407,36 @@ function rejectUser(userId,name){
       <button class="btn-danger" onclick="confirmReject('${userId}')">Reject & Delete</button>
     </div>
   </div>`);
+}
+
+function editUserPhone(userId,currentPhone,userName){
+  showModal(`
+    <div class="modal-head"><span class="modal-title">📱 Edit Mobile Number</span><button class="modal-close" onclick="openAdminPanel()">×</button></div>
+    <div class="modal-body">
+      <div style="font-size:13px;color:var(--mu);margin-bottom:12px">Editing mobile number for <strong>${esc(userName||"this user")}</strong></div>
+      <div class="lf" style="margin-bottom:16px">
+        <label class="fl">WhatsApp Mobile Number</label>
+        <input class="fi" id="edit-phone-input" type="tel" value="${esc(currentPhone)}" placeholder="e.g. 971501234567"/>
+        <div style="font-size:11px;color:var(--mu);margin-top:4px">Enter in international format without + (e.g. 971501234567)</div>
+      </div>
+      <div class="modal-acts">
+        <button class="btn-cancel" onclick="openAdminPanel()">Cancel</button>
+        <button class="btn-primary" onclick="saveUserPhone('${userId}')">Save Number</button>
+      </div>
+    </div>
+  `);
+}
+
+async function saveUserPhone(userId){
+  const input=document.getElementById("edit-phone-input");
+  if(!input)return;
+  const phone=input.value.trim().replace(/\D/g,"");
+  loader("Saving…");
+  const {error}=await db.from("user_roles").update({phone}).eq("user_id",userId);
+  noloader();
+  if(error){toast("Failed to save: "+error.message,"#dc2626");return;}
+  toast("Mobile number saved ✓","#16a34a");
+  openAdminPanel();
 }
 
 async function confirmReject(userId){
