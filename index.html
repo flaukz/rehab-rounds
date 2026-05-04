@@ -378,7 +378,7 @@ input,select,textarea{font-family:var(--font);}
       <button class="hdr-btn" id="hdr-privacy-btn" onclick="togPrivacy()" title="Toggle patient confidentiality mode">🔓 Privacy</button>
       <button class="hdr-btn" id="hdr-admin-btn" onclick="openAdminPanel()" style="display:none">👑 Users</button>
       <button class="hdr-btn" id="hdr-notif-btn" onclick="openNotifPanel()" title="Reply notifications" style="position:relative">
-        🔔 <span id="notif-badge" style="display:none;position:absolute;top:-5px;right:-5px;background:#dc2626;color:#fff;font-size:10px;font-weight:700;border-radius:50%;width:18px;height:18px;display:none;align-items:center;justify-content:center;line-height:1">0</span>
+        🔔 <span id="notif-badge" style="position:absolute;top:-5px;right:-5px;background:#dc2626;color:#fff;font-size:10px;font-weight:700;border-radius:50%;width:18px;height:18px;display:none;align-items:center;justify-content:center;line-height:1">0</span>
       </button>
       <span class="hdr-date" id="hdr-date"></span>
       <span id="hdr-role-badge" style="font-size:10px;font-weight:700;border-radius:20px;padding:3px 10px;"></span>
@@ -507,7 +507,7 @@ function switchAuthTab(tab){
   document.getElementById("register-ok").textContent="";
   // Clear register fields when switching to sign-in to avoid confusion
   if(tab==="signin"){
-    ["rn","re","rp","rp2"].forEach(id=>{const el=document.getElementById(id);if(el)el.value="";});
+    ["rn","rph","re","rp","rp2"].forEach(id=>{const el=document.getElementById(id);if(el)el.value="";});
   }
 }
 
@@ -639,9 +639,22 @@ async function onLogin(user){
   startRealtimeNotifications();
   render();
 }
-async function doLogout(){
-  if(!confirm("Sign out?"))return;
-  await db.auth.signOut();location.reload();
+function doLogout(){
+  showModal(`<div class="confirm-box">
+    <div class="conf-icon">👋</div>
+    <div class="conf-title">Sign Out?</div>
+    <div class="conf-msg">You will be returned to the login screen.</div>
+    <div class="conf-sub"></div>
+    <div class="modal-acts" style="width:100%">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-danger" onclick="confirmLogout()">Sign Out</button>
+    </div>
+  </div>`);
+}
+async function confirmLogout(){
+  closeModal();
+  await db.auth.signOut();
+  location.reload();
 }
 (async()=>{
   try{
@@ -692,7 +705,7 @@ const p2l=(p,nm)=>({
   ptHistory:nm[p.id+"_pt"]||[],otHistory:nm[p.id+"_ot"]||[],slpHistory:nm[p.id+"_slp"]||[],
 });
 const n2l=(n,replies)=>({id:n.id,text:n.text,ts:n.created_at,authorName:n.author_name||"",editedAt:n.edited_at,replies});
-const r2l=r=>({id:r.id,text:r.text,ts:r.created_at,authorName:r.author_name||""});
+const r2l=r=>({id:r.id,text:r.text,ts:r.created_at,authorName:r.author_name||"",authorId:r.author_id||null});
 function updL(id,changes){S.patients=S.patients.map(p=>p.id===id?{...p,...changes}:p);}
 
 // ═══════════════════════════════════════
@@ -760,7 +773,6 @@ function renderSidebar(){
     patients.forEach(p=>{const w=p.ward||"Ward A";if(!byWard[w])byWard[w]=[];byWard[w].push(p);});
     return WARD_ORDER.filter(w=>byWard[w])
       .map(w=>{
-        const wd=WARDS.find(x=>x.id===w)||{};
         return `<div style="background:#f8f0f1;padding:4px 14px;font-size:10px;font-weight:700;color:#9b6670;text-transform:uppercase;letter-spacing:0.06em;border-bottom:1px solid #f0e4e6">
             <span class="${wbc(w)}" style="font-size:9px;padding:1px 6px;border-radius:4px;margin-right:4px">${esc(w)}</span>
           </div>`+byWard[w].map(p=>buildRow(p,false)).join("");
@@ -1132,20 +1144,18 @@ async function saveNote(pid,draftF,histF){
 
   // Send in-app notifications to assigned therapists for Physician & Round notes
   if(type==="physician"||type==="round"){
-    sendTherapistNotifications(p,type,p[draftF]?.trim()||nd.text);
+    sendTherapistNotifications(p,type,nd.text||"");
   }
 }
 
 async function sendTherapistNotifications(p,noteType,noteText){
-  // Find user_ids for the assigned PT, OT, SLP by matching full_name in user_roles
   const therapistNames=[p.primaryPt,p.primaryOt,p.primarySlp].filter(Boolean);
   if(!therapistNames.length)return;
   const {data:userRows}=await db.from("user_roles").select("user_id,full_name").in("full_name",therapistNames);
   if(!userRows||!userRows.length)return;
   const NOTE_LABEL=noteType==="physician"?"Physician Orders":"Round Notes";
-  const patLabel=p.name||"Room "+p.room;
   const notifRows=userRows
-    .filter(u=>u.user_id!==currentUser?.id) // don't notify yourself
+    .filter(u=>u.user_id!==currentUser?.id)
     .map(u=>({
       for_user_id:u.user_id,
       patient_id:p.id,
@@ -1322,7 +1332,17 @@ async function subPat(eid){
   const editId=(eid===null||eid==="null")?null:eid;
   loader(editId?"Saving…":"Adding…");
   if(editId){
-    const {error}=await db.from("patients").update({room,mrn,name,primary_pt:primaryPt,primary_ot:primaryOt,primary_slp:primarySlp,pt_phone:ptPhone,ot_phone:otPhone,slp_phone:slpPhone,classification:cls,high_priority:hp,is_urgent:isUrgent,ward,updated_at:new Date().toISOString()}).eq("id",editId);
+    const {error}=await db.from("patients").update({
+      room,mrn,name,primary_pt:primaryPt,primary_ot:primaryOt,primary_slp:primarySlp,
+      pt_phone:ptPhone,ot_phone:otPhone,slp_phone:slpPhone,
+      classification:cls,high_priority:hp,is_urgent:isUrgent,ward,
+      // Reset flag ownership if flags changed via form
+      priority_by:hp?(S.patients.find(x=>x.id===editId)?.highPriority===hp?undefined:null):null,
+      priority_by_name:hp?(S.patients.find(x=>x.id===editId)?.highPriority===hp?undefined:""):"",
+      urgent_by:isUrgent?(S.patients.find(x=>x.id===editId)?.isUrgent===isUrgent?undefined:null):null,
+      urgent_by_name:isUrgent?(S.patients.find(x=>x.id===editId)?.isUrgent===isUrgent?undefined:""):"",
+      updated_at:new Date().toISOString()
+    }).eq("id",editId);
     noloader();if(error){toast("Failed: "+error.message,"#dc2626");return;}
     updL(editId,{room,mrn,name,primaryPt,primaryOt,primarySlp,ptPhone,otPhone,slpPhone,classification:cls,highPriority:hp,isUrgent,ward});
     closeModal();render();toast("Patient updated ✓","#16a34a");
@@ -1676,8 +1696,6 @@ function startRealtimeNotifications(){
       }
     }).subscribe();
 }
-
-function buildNotifsFromState(){updateNotifBadge();}
 
 // ═══════════════════════════════════════
 //  PWA SERVICE WORKER
