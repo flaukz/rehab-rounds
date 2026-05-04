@@ -635,8 +635,8 @@ async function onLogin(user){
   loader("Loading patients…");
   await loadAll();
   noloader();
-  buildNotifsFromState();
-  startRealtimeReplies();
+  await loadNotifications();
+  startRealtimeNotifications();
   render();
 }
 async function doLogout(){
@@ -1070,6 +1070,33 @@ async function saveNote(pid,draftF,histF){
   }
   updL(pid,changes);renderMain();renderSidebar();
   if(!flagRemoved)toast("Note saved ✓","#16a34a");
+
+  // Send in-app notifications to assigned therapists for Physician & Round notes
+  if(type==="physician"||type==="round"){
+    sendTherapistNotifications(p,type,p[draftF]?.trim()||nd.text);
+  }
+}
+
+async function sendTherapistNotifications(p,noteType,noteText){
+  // Find user_ids for the assigned PT, OT, SLP by matching full_name in user_roles
+  const therapistNames=[p.primaryPt,p.primaryOt,p.primarySlp].filter(Boolean);
+  if(!therapistNames.length)return;
+  const {data:userRows}=await db.from("user_roles").select("user_id,full_name").in("full_name",therapistNames);
+  if(!userRows||!userRows.length)return;
+  const NOTE_LABEL=noteType==="physician"?"Physician Orders":"Round Notes";
+  const patLabel=p.name||"Room "+p.room;
+  const notifRows=userRows
+    .filter(u=>u.user_id!==currentUser?.id) // don't notify yourself
+    .map(u=>({
+      for_user_id:u.user_id,
+      patient_id:p.id,
+      note_type:NOTE_LABEL,
+      note_text:noteText,
+      author_name:currentName,
+      is_read:false,
+    }));
+  if(!notifRows.length)return;
+  await db.from("notifications").insert(notifRows);
 }
 
 // note view/edit/delete
@@ -1140,7 +1167,6 @@ async function postReply(pid,hk,nid){
   const rep=r2l(data);
   const p=S.patients.find(x=>x.id===pid);if(!p)return;
   updL(pid,{[hk]:(p[hk]||[]).map(n=>n.id===nid?{...n,replies:[...(n.replies||[]),rep]}:n)});
-  buildNotifsFromState();
   renderMain();toast("Reply posted ✓","#16a34a");
 }
 async function delReply(pid,hk,nid,rid){
@@ -1150,7 +1176,6 @@ async function delReply(pid,hk,nid,rid){
   if(error){toast("Failed to remove reply: "+error.message,"#dc2626");return;}
   const p=S.patients.find(x=>x.id===pid);if(!p)return;
   updL(pid,{[hk]:(p[hk]||[]).map(n=>n.id===nid?{...n,replies:(n.replies||[]).filter(r=>r.id!==rid)}:n)});
-  buildNotifsFromState();
   renderMain();toast("Reply removed.","#64748b");
 }
 
@@ -1453,53 +1478,28 @@ async function confirmReject(userId){
 // ═══════════════════════════════════════
 //  NOTIFICATIONS
 // ═══════════════════════════════════════
-const NOTIF_KEY="salma_read_replies";
-let allNotifs=[]; // {id, replyId, noteId, patientId, patientName, noteType, authorName, text, ts}
+let allNotifs=[];
 let notifPanelOpen=false;
 
-function getReadIds(){try{return new Set(JSON.parse(localStorage.getItem(NOTIF_KEY)||"[]"));}catch{return new Set();}}
-function markRead(ids){
-  const r=getReadIds();ids.forEach(id=>r.add(id));
-  localStorage.setItem(NOTIF_KEY,JSON.stringify([...r]));
-}
-
-function buildNotifsFromState(){
-  const notifs=[];
-  const NOTE_LABELS={physician:"Physician Orders",round:"Round Notes",pt:"PT Notes",ot:"OT Notes",slp:"SLP Notes"};
-  S.patients.forEach(p=>{
-    const histKeys=["physicianHistory","roundHistory","ptHistory","otHistory","slpHistory"];
-    const typeKeys=["physician","round","pt","ot","slp"];
-    histKeys.forEach((hk,i)=>{
-      (p[hk]||[]).forEach(note=>{
-        (note.replies||[]).forEach(rep=>{
-          notifs.push({
-            id:rep.id,
-            patientId:p.id,
-            patientName:p.name||"Room "+p.room,
-            patientRoom:p.room,
-            noteType:NOTE_LABELS[typeKeys[i]],
-            authorName:rep.authorName||"Someone",
-            text:rep.text,
-            ts:rep.ts,
-          });
-        });
-      });
-    });
-  });
-  // Sort newest first
-  notifs.sort((a,b)=>new Date(b.ts)-new Date(a.ts));
-  allNotifs=notifs;
+async function loadNotifications(){
+  const {data}=await db.from("notifications")
+    .select("*").eq("for_user_id",currentUser.id)
+    .order("created_at",{ascending:false}).limit(50);
+  allNotifs=(data||[]).map(n=>({
+    id:n.id,patientId:n.patient_id,noteType:n.note_type,
+    text:n.note_text,authorName:n.author_name,isRead:n.is_read,ts:n.created_at,
+    patientRoom:(S.patients.find(x=>x.id===n.patient_id)||{}).room||"",
+  }));
   updateNotifBadge();
 }
 
 function updateNotifBadge(){
-  const readIds=getReadIds();
-  const unread=allNotifs.filter(n=>!readIds.has(n.id));
+  const unread=allNotifs.filter(n=>!n.isRead).length;
   const badge=document.getElementById("notif-badge");
   const btn=document.getElementById("hdr-notif-btn");
   if(!badge||!btn)return;
-  if(unread.length>0){
-    badge.textContent=unread.length>99?"99+":unread.length;
+  if(unread>0){
+    badge.textContent=unread>99?"99+":unread;
     badge.style.display="flex";
     btn.style.background="rgba(220,38,38,0.25)";
     btn.style.borderColor="rgba(220,38,38,0.6)";
@@ -1510,17 +1510,19 @@ function updateNotifBadge(){
   }
 }
 
-function openNotifPanel(){
+async function openNotifPanel(){
   const panel=document.getElementById("notif-panel");
   if(!panel)return;
   if(notifPanelOpen){closeNotifPanel();return;}
   notifPanelOpen=true;
-  // Mark all as read when panel opens
-  markRead(allNotifs.map(n=>n.id));
-  updateNotifBadge();
+  const unreadIds=allNotifs.filter(n=>!n.isRead).map(n=>n.id);
+  if(unreadIds.length){
+    await db.from("notifications").update({is_read:true}).in("id",unreadIds);
+    allNotifs=allNotifs.map(n=>({...n,isRead:true}));
+    updateNotifBadge();
+  }
   renderNotifPanel();
   panel.style.display="flex";
-  // Close on outside click
   setTimeout(()=>document.addEventListener("click",outsideNotifClick),50);
 }
 
@@ -1534,81 +1536,89 @@ function closeNotifPanel(){
 function outsideNotifClick(e){
   const panel=document.getElementById("notif-panel");
   const btn=document.getElementById("hdr-notif-btn");
-  if(panel&&!panel.contains(e.target)&&!btn.contains(e.target))closeNotifPanel();
+  if(panel&&!panel.contains(e.target)&&btn&&!btn.contains(e.target))closeNotifPanel();
 }
 
 function renderNotifPanel(){
-  const panel=document.getElementById("notif-panel");
-  if(!panel)return;
-  const items=allNotifs.length===0
-    ?`<div class="notif-empty">🔔<br/>No replies yet.<br/><span style="font-size:11px">Replies to notes will appear here.</span></div>`
-    :allNotifs.map(n=>`
-      <div class="notif-item read" onclick="goToPatient('${n.patientId}')">
-        <div class="notif-who">✍️ ${esc(n.authorName)}</div>
-        <div class="notif-where">📋 ${esc(n.noteType)} · ${esc(maskName(n.patientName))} (Room ${esc(n.patientRoom)})</div>
-        <div class="notif-text">${esc(n.text)}</div>
+  const panel=document.getElementById("notif-panel");if(!panel)return;
+  const replyNotifs=buildReplyNotifs();
+  const combined=[...allNotifs,...replyNotifs].sort((a,b)=>new Date(b.ts)-new Date(a.ts));
+  const items=combined.length===0
+    ?`<div class="notif-empty">🔔<br/>No notifications yet.<br/><span style="font-size:11px">You\'ll be notified when notes or replies are posted for your patients.</span></div>`
+    :combined.map(n=>`<div class="notif-item ${n.isRead?"read":"unread"}" onclick="goToPatient(\'${n.patientId}\')">
+        <div class="notif-who">✍️ ${esc(n.authorName||"Someone")}</div>
+        <div class="notif-where">${n.kind==="reply"?"💬":"📋"} ${esc(n.noteType)}${n.patientRoom?" · Room "+esc(n.patientRoom):""}</div>
+        <div class="notif-text">${esc((n.text||"").slice(0,120))}</div>
         <div class="notif-time">🕐 ${fmt(n.ts)}</div>
       </div>`).join("");
   panel.innerHTML=`
     <div class="notif-hdr">
-      <span class="notif-title">🔔 Reply Notifications</span>
+      <span class="notif-title">🔔 Notifications</span>
       <button class="notif-clear" onclick="clearAllNotifs()">Clear All</button>
     </div>
     <div class="notif-list">${items}</div>`;
 }
 
-function goToPatient(pid){
-  closeNotifPanel();
-  if(S.selected!==pid){selPat(pid);}
+function buildReplyNotifs(){
+  const notifs=[];
+  const NOTE_LABELS={physician:"Physician Orders",round:"Round Notes",pt:"PT Notes",ot:"OT Notes",slp:"SLP Notes"};
+  const histKeys=["physicianHistory","roundHistory","ptHistory","otHistory","slpHistory"];
+  const typeKeys=["physician","round","pt","ot","slp"];
+  S.patients.forEach(p=>{
+    histKeys.forEach((hk,i)=>{
+      (p[hk]||[]).forEach(note=>{
+        (note.replies||[]).forEach(rep=>{
+          if(rep.authorId!==currentUser?.id){
+            notifs.push({id:"reply-"+rep.id,patientId:p.id,patientRoom:p.room,
+              noteType:NOTE_LABELS[typeKeys[i]]+" Reply",
+              authorName:rep.authorName||"Someone",
+              text:rep.text,ts:rep.ts,isRead:true,kind:"reply"});
+          }
+        });
+      });
+    });
+  });
+  return notifs.sort((a,b)=>new Date(b.ts)-new Date(a.ts)).slice(0,20);
 }
 
-function clearAllNotifs(){
-  markRead(allNotifs.map(n=>n.id));
-  allNotifs=[];
-  updateNotifBadge();
-  renderNotifPanel();
+function goToPatient(pid){closeNotifPanel();const p=S.patients.find(x=>x.id===pid);if(p)selPat(pid);}
+
+async function clearAllNotifs(){
+  if(allNotifs.length)await db.from("notifications").delete().eq("for_user_id",currentUser.id);
+  allNotifs=[];updateNotifBadge();renderNotifPanel();
 }
 
-function startRealtimeReplies(){
+function startRealtimeNotifications(){
+  db.channel("notif-"+currentUser.id)
+    .on("postgres_changes",{event:"INSERT",schema:"public",table:"notifications",filter:`for_user_id=eq.${currentUser.id}`},payload=>{
+      const n=payload.new;if(!n)return;
+      const pat=S.patients.find(x=>x.id===n.patient_id);
+      allNotifs.unshift({id:n.id,patientId:n.patient_id,noteType:n.note_type,
+        text:n.note_text,authorName:n.author_name,isRead:false,ts:n.created_at,
+        patientRoom:pat?.room||"",kind:"note"});
+      updateNotifBadge();
+      toast(`🔔 ${n.author_name} posted a ${n.note_type} — tap 🔔 to view`,"#7b1f2e");
+    }).subscribe();
   db.channel("replies-notif")
     .on("postgres_changes",{event:"INSERT",schema:"public",table:"replies"},async payload=>{
       const rep=payload.new;
-      if(!rep||rep.author_id===currentUser?.id)return; // don't notify self
-      // Find the note and patient
-      let found=false;
-      const NOTE_LABELS={physician:"Physician Orders",round:"Round Notes",pt:"PT Notes",ot:"OT Notes",slp:"SLP Notes"};
-      const histKeys=["physicianHistory","roundHistory","ptHistory","otHistory","slpHistory"];
-      const typeKeys=["physician","round","pt","ot","slp"];
+      if(!rep||rep.author_id===currentUser?.id)return;
       for(const p of S.patients){
-        for(let i=0;i<histKeys.length;i++){
-          const note=(p[histKeys[i]]||[]).find(n=>n.id===rep.note_id);
+        for(const hk of["physicianHistory","roundHistory","ptHistory","otHistory","slpHistory"]){
+          const note=(p[hk]||[]).find(n=>n.id===rep.note_id);
           if(note){
-            const newNotif={
-              id:rep.id,patientId:p.id,
-              patientName:p.name||"Room "+p.room,
-              patientRoom:p.room,
-              noteType:NOTE_LABELS[typeKeys[i]],
-              authorName:rep.author_name||"Someone",
-              text:rep.text,ts:rep.created_at,
-            };
-            allNotifs.unshift(newNotif);
-            // Also update local state so reply shows in UI
-            updL(p.id,{[histKeys[i]]:(p[histKeys[i]]||[]).map(n=>n.id===rep.note_id?{...n,replies:[...(n.replies||[]),r2l(rep)]}:n)});
+            updL(p.id,{[hk]:(p[hk]||[]).map(n=>n.id===rep.note_id?{...n,replies:[...(n.replies||[]),r2l(rep)]}:n)});
             if(S.selected===p.id)renderMain();
-            found=true;
+            toast(`🔔 ${rep.author_name||"Someone"} replied to a note — tap 🔔 to view`,"#7b1f2e");
+            updateNotifBadge();
             break;
           }
         }
-        if(found)break;
       }
-      updateNotifBadge();
-      if(found){
-        const who=rep.author_name||"Someone";
-        toast(`🔔 ${who} replied to a note — tap 🔔 to view`,"#7b1f2e");
-      }
-    })
-    .subscribe();
+    }).subscribe();
 }
+
+function buildNotifsFromState(){updateNotifBadge();}
 
 // ═══════════════════════════════════════
 //  PWA SERVICE WORKER
