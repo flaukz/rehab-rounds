@@ -301,6 +301,8 @@ input,select,textarea{font-family:var(--font);}
 .ua-reject:hover{background:#b91c1c;}
 .pending-banner{background:#fef9c3;border:1px solid #f59e0b;border-radius:10px;padding:10px 16px;font-size:12px;color:#92400e;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
 
+.wa-btn{display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border-radius:10px;background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;font-size:13px;font-weight:700;text-decoration:none;transition:opacity 0.15s;}
+.wa-btn:hover{opacity:0.88;}
 #toast{position:fixed;top:20px;right:24px;z-index:2000;border-radius:12px;padding:12px 20px;font-size:13px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,0.18);color:#fff;display:none;max-width:340px;}
 .badge{background:#fbbf24;color:#2d1417;border-radius:20px;padding:0 6px;font-size:10px;font-weight:700;}
 #loader{position:fixed;inset:0;background:rgba(45,20,23,0.35);z-index:8000;display:none;align-items:center;justify-content:center;pointer-events:none;}
@@ -657,6 +659,7 @@ async function loadAll(){
 const p2l=(p,nm)=>({
   id:p.id,room:p.room,name:p.name,mrn:p.mrn,
   primaryPt:p.primary_pt||"",primaryOt:p.primary_ot||"",primarySlp:p.primary_slp||"",
+  ptPhone:p.pt_phone||"",otPhone:p.ot_phone||"",slpPhone:p.slp_phone||"",
   classification:p.classification||"ABM",highPriority:p.high_priority||false,isUrgent:p.is_urgent||false,
   ward:p.ward||"Ward A",checklist:{...DEF_CHK,...(p.checklist||{})},equipOthers:p.equip_others||"",
   physicianNotes:"",roundNotes:"",ptNotes:"",otNotes:"",slpNotes:"",
@@ -770,6 +773,22 @@ function renderMain(){
       <span class="cls-badge cls-${p.classification}" style="font-size:12px;padding:5px 14px;font-weight:700">${p.classification}</span>
     </div>
   </div>
+  ${p.isUrgent&&(p.ptPhone||p.otPhone||p.slpPhone)?`
+  <div class="chk-card" style="border-color:#fca5a5;background:#fff;">
+    <div class="card-hdr" style="background:linear-gradient(90deg,#fff1f1,#fff8f8);border-bottom-color:#fca5a5;">
+      <span>📲</span><span class="card-hdr-lbl" style="color:#dc2626">WHATSAPP URGENT ALERT</span>
+    </div>
+    <div style="padding:14px 20px;display:flex;flex-direction:column;gap:10px;">
+      <div style="font-size:12px;color:#64748b;line-height:1.6;">
+        Tap a button below to send a pre-filled WhatsApp message to the therapist. The message will include the patient details and the note from the <strong>Others</strong> field.
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        ${p.ptPhone?`<a href="${buildWALink(p,'PT',p.primaryPt,p.ptPhone)}" target="_blank" class="wa-btn">💬 WhatsApp PT${p.primaryPt?" — "+esc(p.primaryPt):""}</a>`:""}
+        ${p.otPhone?`<a href="${buildWALink(p,'OT',p.primaryOt,p.otPhone)}" target="_blank" class="wa-btn">💬 WhatsApp OT${p.primaryOt?" — "+esc(p.primaryOt):""}</a>`:""}
+        ${p.slpPhone?`<a href="${buildWALink(p,'SLP',p.primarySlp,p.slpPhone)}" target="_blank" class="wa-btn">💬 WhatsApp SLP${p.primarySlp?" — "+esc(p.primarySlp):""}</a>`:""}
+      </div>
+    </div>
+  </div>`:""}
   <div class="chk-card">
     <div class="card-hdr"><span>📋</span><span class="card-hdr-lbl">ROUNDING CHECKLIST</span></div>
     <div class="chk-items">
@@ -1143,9 +1162,16 @@ function patForm(p){
     <div><label class="fl">Patient Name</label><input class="fi" id="fn" value="${esc(v.name)}" placeholder="Full name"/></div>
     <div class="g2">
       <div><label class="fl">Primary PT</label><input class="fi" id="fpt" value="${esc(v.primaryPt||"")}" placeholder="e.g. Dr. Rivera"/></div>
-      <div><label class="fl">Primary OT</label><input class="fi" id="fot" value="${esc(v.primaryOt||"")}" placeholder="e.g. Dr. Kim"/></div>
+      <div><label class="fl">PT WhatsApp No.</label><input class="fi" id="fptph" value="${esc(v.ptPhone||"")}" placeholder="e.g. 971501234567"/></div>
     </div>
-    <div><label class="fl">Primary SLP</label><input class="fi" id="fslp" value="${esc(v.primarySlp||"")}" placeholder="e.g. Dr. Patel"/></div>
+    <div class="g2">
+      <div><label class="fl">Primary OT</label><input class="fi" id="fot" value="${esc(v.primaryOt||"")}" placeholder="e.g. Dr. Kim"/></div>
+      <div><label class="fl">OT WhatsApp No.</label><input class="fi" id="fotph" value="${esc(v.otPhone||"")}" placeholder="e.g. 971501234567"/></div>
+    </div>
+    <div class="g2">
+      <div><label class="fl">Primary SLP</label><input class="fi" id="fslp" value="${esc(v.primarySlp||"")}" placeholder="e.g. Dr. Patel"/></div>
+      <div><label class="fl">SLP WhatsApp No.</label><input class="fi" id="fslpph" value="${esc(v.slpPhone||"")}" placeholder="e.g. 971501234567"/></div>
+    </div>
     <div class="g2">
       <div><label class="fl">Ward</label><select class="fi" id="fw">${wOpts}</select></div>
       <div><label class="fl">Classification</label><select class="fi" id="fc">${opts}</select></div>
@@ -1166,25 +1192,33 @@ function patForm(p){
     </div>
   </div>`;
 }
+function buildWALink(p,role,name,phone){
+  const patLabel=p.name||"Room "+p.room;
+  const ward=p.ward||"Ward A";
+  const note=p.equipOthers?`\n📋 Note: ${p.equipOthers}`:"";
+  const msg=`🚨 *URGENT PATIENT ALERT*\n\nDear ${name||role},\n\nPatient *${patLabel}* (Room ${p.room}, ${ward}) has been flagged as *URGENT*.\n\nMRN: ${p.mrn||"—"}${note}\n\nPlease attend to this patient as soon as possible.\n\n— Salma Rahba Rehabilitation Medicine Rounding System`;
+  const clean=phone.replace(/\D/g,"");
+  return `https://wa.me/${clean}?text=${encodeURIComponent(msg)}`;
+}
 function togP(){const i=document.getElementById("fp"),b=document.getElementById("fpb"),l=document.getElementById("fpl");const o=i.value==="1";i.value=o?"0":"1";b.className="ptoggle"+(o?"":" on");l.textContent=o?"Normal":"Priority";}
 function togU(){const i=document.getElementById("fu"),b=document.getElementById("fub"),l=document.getElementById("ful");const o=i.value==="1";i.value=o?"0":"1";b.className="utoggle"+(o?"":" on");l.textContent=o?"Normal":"Urgent";}
 
 async function subPat(eid){
   const room=document.getElementById("fr").value.trim(),mrn=document.getElementById("fm").value.trim(),name=document.getElementById("fn").value.trim();
   const primaryPt=document.getElementById("fpt").value.trim(),primaryOt=document.getElementById("fot").value.trim(),primarySlp=document.getElementById("fslp").value.trim();
+  const ptPhone=document.getElementById("fptph").value.trim(),otPhone=document.getElementById("fotph").value.trim(),slpPhone=document.getElementById("fslpph").value.trim();
   const cls=document.getElementById("fc").value,ward=document.getElementById("fw").value;
   const hp=document.getElementById("fp").value==="1",isUrgent=document.getElementById("fu").value==="1";
   if(!room){toast("Room number is required.","#dc2626");return;}
-  // eid is passed as a string from onclick — convert "null" string to actual null
   const editId=(eid===null||eid==="null")?null:eid;
   loader(editId?"Saving…":"Adding…");
   if(editId){
-    const {error}=await db.from("patients").update({room,mrn,name,primary_pt:primaryPt,primary_ot:primaryOt,primary_slp:primarySlp,classification:cls,high_priority:hp,is_urgent:isUrgent,ward,updated_at:new Date().toISOString()}).eq("id",editId);
+    const {error}=await db.from("patients").update({room,mrn,name,primary_pt:primaryPt,primary_ot:primaryOt,primary_slp:primarySlp,pt_phone:ptPhone,ot_phone:otPhone,slp_phone:slpPhone,classification:cls,high_priority:hp,is_urgent:isUrgent,ward,updated_at:new Date().toISOString()}).eq("id",editId);
     noloader();if(error){toast("Failed: "+error.message,"#dc2626");return;}
-    updL(editId,{room,mrn,name,primaryPt,primaryOt,primarySlp,classification:cls,highPriority:hp,isUrgent,ward});
+    updL(editId,{room,mrn,name,primaryPt,primaryOt,primarySlp,ptPhone,otPhone,slpPhone,classification:cls,highPriority:hp,isUrgent,ward});
     closeModal();render();toast("Patient updated ✓","#16a34a");
   }else{
-    const {data,error}=await db.from("patients").insert({room,mrn,name,primary_pt:primaryPt,primary_ot:primaryOt,primary_slp:primarySlp,classification:cls,high_priority:hp,is_urgent:isUrgent,ward,checklist:DEF_CHK,equip_others:""}).select().single();
+    const {data,error}=await db.from("patients").insert({room,mrn,name,primary_pt:primaryPt,primary_ot:primaryOt,primary_slp:primarySlp,pt_phone:ptPhone,ot_phone:otPhone,slp_phone:slpPhone,classification:cls,high_priority:hp,is_urgent:isUrgent,ward,checklist:DEF_CHK,equip_others:""}).select().single();
     noloader();if(error){toast("Failed: "+error.message,"#dc2626");return;}
     S.patients.push(p2l(data,{}));S.selected=data.id;
     expandPatientGroup(data.id);
