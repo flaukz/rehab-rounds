@@ -688,7 +688,7 @@ function renderSidebar(){
   const hpC=filt.filter(p=>p.highPriority).length;
   const unstC=filt.filter(p=>p.checklist?.unstable).length;
 
-  const buildRow=p=>{
+  const buildRow=(p,showWard=false)=>{
     const isAct=p.id===S.selected;
     const done=Object.values(p.checklist).filter(Boolean).length;
     const acts=[
@@ -696,10 +696,12 @@ function renderSidebar(){
       canManagePatients() ? `<button class="ra-btn" onclick="event.stopPropagation();openArcConfirm('${p.id}')">Archive</button>` : "",
       canDeletePatients() ? `<button class="rd-btn" onclick="event.stopPropagation();openDelConfirm('${p.id}')">🗑️</button>` : "",
     ].join("");
+    const wardTag=showWard?`<span class="${wbc(p.ward)}" style="font-size:10px;padding:1px 6px;border-radius:4px;margin-left:2px">${esc(p.ward||"Ward A")}</span>`:"";
     return `<div class="pat-row${isAct?" active":""}" onclick="selPat('${p.id}')">
       <div class="row-top">
-        <div style="display:flex;align-items:center;gap:7px">
+        <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
           <span class="row-room">${esc(p.room)}</span>
+          ${wardTag}
           ${p.isUrgent?"<span title='Urgent'>🔴</span>":""}
           ${p.highPriority?"<span title='Priority'>🚩</span>":""}
           ${p.checklist.unstable?"<span title='Unstable'>⚠️</span>":""}
@@ -719,11 +721,11 @@ function renderSidebar(){
 
   let html="";
   const urgP=sortR(filt.filter(p=>p.isUrgent));
-  if(urgP.length>0){const c=collapsed.has("__urg__");html+=`<div class="ward-section urg-section"><button class="ward-hdr urg-hdr" onclick="togWard('__urg__')"><span>🔴</span><span class="ward-name" style="color:#dc2626">Urgent</span><span class="ward-cnt" style="background:#fee2e2;color:#991b1b">${urgP.length}</span><span class="ward-chev">${c?"▶":"▼"}</span></button><div class="ward-pats${c?" collapsed":""}">${urgP.map(buildRow).join("")}</div></div>`;}
+  if(urgP.length>0){const c=collapsed.has("__urg__");html+=`<div class="ward-section urg-section"><button class="ward-hdr urg-hdr" onclick="togWard('__urg__')"><span>🔴</span><span class="ward-name" style="color:#dc2626">Urgent</span><span class="ward-cnt" style="background:#fee2e2;color:#991b1b">${urgP.length}</span><span class="ward-chev">${c?"▶":"▼"}</span></button><div class="ward-pats${c?" collapsed":""}">${urgP.map(p=>buildRow(p,true)).join("")}</div></div>`;}
   const priP=sortR(filt.filter(p=>p.highPriority));
-  if(priP.length>0){const c=collapsed.has("__pri__");html+=`<div class="ward-section pri-section"><button class="ward-hdr pri-hdr" onclick="togWard('__pri__')"><span>🚩</span><span class="ward-name" style="color:#9b2335">Priority</span><span class="ward-cnt" style="background:#fad5d9;color:#7b1f2e">${priP.length}</span><span class="ward-chev">${c?"▶":"▼"}</span></button><div class="ward-pats${c?" collapsed":""}">${priP.map(buildRow).join("")}</div></div>`;}
+  if(priP.length>0){const c=collapsed.has("__pri__");html+=`<div class="ward-section pri-section"><button class="ward-hdr pri-hdr" onclick="togWard('__pri__')"><span>🚩</span><span class="ward-name" style="color:#9b2335">Priority</span><span class="ward-cnt" style="background:#fad5d9;color:#7b1f2e">${priP.length}</span><span class="ward-chev">${c?"▶":"▼"}</span></button><div class="ward-pats${c?" collapsed":""}">${priP.map(p=>buildRow(p,true)).join("")}</div></div>`;}
   const unstP=sortR(filt.filter(p=>p.checklist?.unstable));
-  if(unstP.length>0){const c=collapsed.has("__unst__");html+=`<div class="ward-section unst-section"><button class="ward-hdr unst-hdr" onclick="togWard('__unst__')"><span>⚠️</span><span class="ward-name" style="color:#d97706">Unstable</span><span class="ward-cnt" style="background:#fef3c7;color:#92400e">${unstP.length}</span><span class="ward-chev">${c?"▶":"▼"}</span></button><div class="ward-pats${c?" collapsed":""}">${unstP.map(buildRow).join("")}</div></div>`;}
+  if(unstP.length>0){const c=collapsed.has("__unst__");html+=`<div class="ward-section unst-section"><button class="ward-hdr unst-hdr" onclick="togWard('__unst__')"><span>⚠️</span><span class="ward-name" style="color:#d97706">Unstable</span><span class="ward-cnt" style="background:#fef3c7;color:#92400e">${unstP.length}</span><span class="ward-chev">${c?"▶":"▼"}</span></button><div class="ward-pats${c?" collapsed":""}">${unstP.map(p=>buildRow(p,true)).join("")}</div></div>`;}
   WARDS.forEach(w=>{
     const wp=sortR(filt.filter(p=>(p.ward||"Ward A")===w.id));
     const c=collapsed.has(w.id);
@@ -962,7 +964,6 @@ async function togFlag(pid,flag){
     collapsed.delete(groupKey);
   } else {
     // Flag turned OFF — check if that group is now empty; if so collapse it
-    const updated=S.patients.find(x=>x.id===pid);
     const stillInGroup=S.patients.filter(x=>x.id!==pid).some(x=>isPriority?x.highPriority:x.isUrgent);
     if(!stillInGroup)collapsed.add(groupKey);
   }
