@@ -1052,8 +1052,10 @@ async function togFlag(pid,flag){
 
   // Turning OFF — only the person who flagged (or admin) can remove it
   if(isFlagOn){
-    if(!isAdmin()&&flagOwner&&flagOwner!==currentUser?.id){
-      toast(`Only ${flagOwnerName||"the person who flagged this"} or an Admin can remove the ${flagLabel} flag.`,"#dc2626");
+    const isOwner=flagOwner&&flagOwner===currentUser?.id;
+    if(!isAdmin()&&!isOwner){
+      const byWhom=flagOwnerName?`Only ${flagOwnerName} or an Admin`:"Only an Admin";
+      toast(`${byWhom} can remove the ${flagLabel} flag.`,"#dc2626");
       return;
     }
   }
