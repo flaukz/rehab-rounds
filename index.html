@@ -684,6 +684,8 @@ const p2l=(p,nm)=>({
   primaryPt:p.primary_pt||"",primaryOt:p.primary_ot||"",primarySlp:p.primary_slp||"",
   ptPhone:p.pt_phone||"",otPhone:p.ot_phone||"",slpPhone:p.slp_phone||"",
   classification:p.classification||"ABM",highPriority:p.high_priority||false,isUrgent:p.is_urgent||false,
+  priorityById:p.priority_by||null,priorityByName:p.priority_by_name||"",
+  urgentById:p.urgent_by||null,urgentByName:p.urgent_by_name||"",
   ward:p.ward||"Ward A",checklist:{...DEF_CHK,...(p.checklist||{})},equipOthers:p.equip_others||"",
   physicianNotes:"",roundNotes:"",ptNotes:"",otNotes:"",slpNotes:"",
   physicianHistory:nm[p.id+"_physician"]||[],roundHistory:nm[p.id+"_round"]||[],
@@ -728,8 +730,8 @@ function renderSidebar(){
         <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
           <span class="row-room">${esc(p.room)}</span>
           ${wardTag}
-          ${p.isUrgent?"<span title='Urgent'>🔴</span>":""}
-          ${p.highPriority?"<span title='Priority'>🚩</span>":""}
+          ${p.isUrgent?`<span title='Urgent${p.urgentByName?" — flagged by "+p.urgentByName:""}'>🔴</span>`:""}
+          ${p.highPriority?`<span title='Priority${p.priorityByName?" — flagged by "+p.priorityByName:""}'>🚩</span>`:""}
           ${p.checklist.unstable?"<span title='Unstable'>⚠️</span>":""}
         </div>
         <span class="cls-badge cls-${p.classification}">${p.classification}</span>
@@ -743,15 +745,35 @@ function renderSidebar(){
       ${acts?`<div class="row-acts">${acts}</div>`:""}
     </div>`;
   };
-  const sortR=arr=>[...arr].sort((a,b)=>{const nA=parseInt(a.room)||0,nB=parseInt(b.room)||0;return nA!==nB?nA-nB:a.room.localeCompare(b.room);});
+  const WARD_ORDER=WARDS.map(w=>w.id);
+  const sortR=arr=>[...arr].sort((a,b)=>{
+    const wA=WARD_ORDER.indexOf(a.ward||"Ward A"),wB=WARD_ORDER.indexOf(b.ward||"Ward A");
+    if(wA!==wB)return wA-wB;
+    const nA=parseInt(a.room)||0,nB=parseInt(b.room)||0;
+    return nA!==nB?nA-nB:(a.room||"").localeCompare(b.room||"");
+  });
+
+  // Render patients grouped by ward with sub-headers — used inside flag groups
+  const buildFlagGroup=patients=>{
+    if(!patients.length)return"";
+    const byWard={};
+    patients.forEach(p=>{const w=p.ward||"Ward A";if(!byWard[w])byWard[w]=[];byWard[w].push(p);});
+    return WARD_ORDER.filter(w=>byWard[w])
+      .map(w=>{
+        const wd=WARDS.find(x=>x.id===w)||{};
+        return `<div style="background:#f8f0f1;padding:4px 14px;font-size:10px;font-weight:700;color:#9b6670;text-transform:uppercase;letter-spacing:0.06em;border-bottom:1px solid #f0e4e6">
+            <span class="${wbc(w)}" style="font-size:9px;padding:1px 6px;border-radius:4px;margin-right:4px">${esc(w)}</span>
+          </div>`+byWard[w].map(p=>buildRow(p,false)).join("");
+      }).join("");
+  };
 
   let html="";
   const urgP=sortR(filt.filter(p=>p.isUrgent));
-  if(urgP.length>0){const c=collapsed.has("__urg__");html+=`<div class="ward-section urg-section"><button class="ward-hdr urg-hdr" onclick="togWard('__urg__')"><span>🔴</span><span class="ward-name" style="color:#dc2626">Urgent</span><span class="ward-cnt" style="background:#fee2e2;color:#991b1b">${urgP.length}</span><span class="ward-chev">${c?"▶":"▼"}</span></button><div class="ward-pats${c?" collapsed":""}">${urgP.map(p=>buildRow(p,true)).join("")}</div></div>`;}
+  if(urgP.length>0){const c=collapsed.has("__urg__");html+=`<div class="ward-section urg-section"><button class="ward-hdr urg-hdr" onclick="togWard('__urg__')"><span>🔴</span><span class="ward-name" style="color:#dc2626">Urgent</span><span class="ward-cnt" style="background:#fee2e2;color:#991b1b">${urgP.length}</span><span class="ward-chev">${c?"▶":"▼"}</span></button><div class="ward-pats${c?" collapsed":""}">${buildFlagGroup(urgP)}</div></div>`;}
   const priP=sortR(filt.filter(p=>p.highPriority));
-  if(priP.length>0){const c=collapsed.has("__pri__");html+=`<div class="ward-section pri-section"><button class="ward-hdr pri-hdr" onclick="togWard('__pri__')"><span>🚩</span><span class="ward-name" style="color:#9b2335">Priority</span><span class="ward-cnt" style="background:#fad5d9;color:#7b1f2e">${priP.length}</span><span class="ward-chev">${c?"▶":"▼"}</span></button><div class="ward-pats${c?" collapsed":""}">${priP.map(p=>buildRow(p,true)).join("")}</div></div>`;}
+  if(priP.length>0){const c=collapsed.has("__pri__");html+=`<div class="ward-section pri-section"><button class="ward-hdr pri-hdr" onclick="togWard('__pri__')"><span>🚩</span><span class="ward-name" style="color:#9b2335">Priority</span><span class="ward-cnt" style="background:#fad5d9;color:#7b1f2e">${priP.length}</span><span class="ward-chev">${c?"▶":"▼"}</span></button><div class="ward-pats${c?" collapsed":""}">${buildFlagGroup(priP)}</div></div>`;}
   const unstP=sortR(filt.filter(p=>p.checklist?.unstable));
-  if(unstP.length>0){const c=collapsed.has("__unst__");html+=`<div class="ward-section unst-section"><button class="ward-hdr unst-hdr" onclick="togWard('__unst__')"><span>⚠️</span><span class="ward-name" style="color:#d97706">Unstable</span><span class="ward-cnt" style="background:#fef3c7;color:#92400e">${unstP.length}</span><span class="ward-chev">${c?"▶":"▼"}</span></button><div class="ward-pats${c?" collapsed":""}">${unstP.map(p=>buildRow(p,true)).join("")}</div></div>`;}
+  if(unstP.length>0){const c=collapsed.has("__unst__");html+=`<div class="ward-section unst-section"><button class="ward-hdr unst-hdr" onclick="togWard('__unst__')"><span>⚠️</span><span class="ward-name" style="color:#d97706">Unstable</span><span class="ward-cnt" style="background:#fef3c7;color:#92400e">${unstP.length}</span><span class="ward-chev">${c?"▶":"▼"}</span></button><div class="ward-pats${c?" collapsed":""}">${buildFlagGroup(unstP)}</div></div>`;}
   WARDS.forEach(w=>{
     const wp=sortR(filt.filter(p=>(p.ward||"Ward A")===w.id));
     const c=collapsed.has(w.id);
@@ -821,16 +843,24 @@ function renderMain(){
     <div class="chk-divider"><span>🚨 Status Flags</span></div>
     <div class="chk-items">
       <button onclick="togFlag('${p.id}','priority')"
-        style="flex:1;min-width:140px;padding:14px 16px;border-radius:12px;border:2px solid ${p.highPriority?"#dc2626":"#f5d5d8"};background:${p.highPriority?"linear-gradient(135deg,#fee2e2,#fff8f8)":"#fdf8f8"};display:flex;align-items:center;gap:12px;transition:all 0.15s;cursor:pointer;">
+        style="flex:1;min-width:140px;padding:14px 16px;border-radius:12px;border:2px solid ${p.highPriority?"#dc2626":"#f5d5d8"};background:${p.highPriority?"linear-gradient(135deg,#fee2e2,#fff8f8)":"#fdf8f8"};display:flex;align-items:center;gap:12px;transition:all 0.15s;cursor:pointer;${p.highPriority&&!isAdmin()&&p.priorityById&&p.priorityById!==currentUser?.id?"opacity:0.7;":""}">
         <div style="width:28px;height:28px;border-radius:8px;background:${p.highPriority?"#dc2626":"#f5d5d8"};display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">${p.highPriority?"🚩":""}</div>
-        <div><div style="font-weight:600;font-size:13px;color:${p.highPriority?"#991b1b":"#64748b"}"> Priority</div>
-        <div style="font-size:10px;color:${p.highPriority?"#dc2626":"var(--fa)"}"> ${p.highPriority?"Marked":"Tap to mark"}</div></div>
+        <div style="text-align:left">
+          <div style="font-weight:600;font-size:13px;color:${p.highPriority?"#991b1b":"#64748b"}"> Priority</div>
+          <div style="font-size:10px;color:${p.highPriority?"#dc2626":"var(--fa)"}">
+            ${p.highPriority?(p.priorityByName?`By ${esc(p.priorityByName)}`:"Marked"):"Tap to mark"}
+          </div>
+        </div>
       </button>
       <button onclick="togFlag('${p.id}','urgent')"
-        style="flex:1;min-width:140px;padding:14px 16px;border-radius:12px;border:2px solid ${p.isUrgent?"#dc2626":"#f5d5d8"};background:${p.isUrgent?"linear-gradient(135deg,#fee2e2,#fff8f8)":"#fdf8f8"};display:flex;align-items:center;gap:12px;transition:all 0.15s;cursor:pointer;">
+        style="flex:1;min-width:140px;padding:14px 16px;border-radius:12px;border:2px solid ${p.isUrgent?"#dc2626":"#f5d5d8"};background:${p.isUrgent?"linear-gradient(135deg,#fee2e2,#fff8f8)":"#fdf8f8"};display:flex;align-items:center;gap:12px;transition:all 0.15s;cursor:pointer;${p.isUrgent&&!isAdmin()&&p.urgentById&&p.urgentById!==currentUser?.id?"opacity:0.7;":""}">
         <div style="width:28px;height:28px;border-radius:8px;background:${p.isUrgent?"#dc2626":"#f5d5d8"};display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">${p.isUrgent?"🔴":""}</div>
-        <div><div style="font-weight:600;font-size:13px;color:${p.isUrgent?"#991b1b":"#64748b"}"> Urgent</div>
-        <div style="font-size:10px;color:${p.isUrgent?"#dc2626":"var(--fa)"}"> ${p.isUrgent?"Marked":"Tap to mark"}</div></div>
+        <div style="text-align:left">
+          <div style="font-weight:600;font-size:13px;color:${p.isUrgent?"#991b1b":"#64748b"}"> Urgent</div>
+          <div style="font-size:10px;color:${p.isUrgent?"#dc2626":"var(--fa)"}">
+            ${p.isUrgent?(p.urgentByName?`By ${esc(p.urgentByName)}`:"Marked"):"Tap to mark"}
+          </div>
+        </div>
       </button>
     </div>
     <div class="chk-divider"><span>📦 Equipment Order</span></div>
@@ -996,23 +1026,52 @@ async function togChk(pid,key){
 async function togFlag(pid,flag){
   const p=S.patients.find(x=>x.id===pid);if(!p)return;
   const isPriority=flag==="priority";
-  const newVal=isPriority?!p.highPriority:!p.isUrgent;
-  const dbField=isPriority?"high_priority":"is_urgent";
-  const localField=isPriority?"highPriority":"isUrgent";
+  const isFlagOn=isPriority?p.highPriority:p.isUrgent;
+  const flagOwner=isPriority?p.priorityById:p.urgentById;
+  const flagOwnerName=isPriority?p.priorityByName:p.urgentByName;
+  const localFlag=isPriority?"highPriority":"isUrgent";
+  const localById=isPriority?"priorityById":"urgentById";
+  const localByName=isPriority?"priorityByName":"urgentByName";
+  const dbFlag=isPriority?"high_priority":"is_urgent";
+  const dbById=isPriority?"priority_by":"urgent_by";
+  const dbByName=isPriority?"priority_by_name":"urgent_by_name";
   const groupKey=isPriority?"__pri__":"__urg__";
-  updL(pid,{[localField]:newVal});
+  const flagLabel=isPriority?"🚩 Priority":"🔴 Urgent";
+
+  // Turning OFF — only the person who flagged (or admin) can remove it
+  if(isFlagOn){
+    if(!isAdmin()&&flagOwner&&flagOwner!==currentUser?.id){
+      toast(`Only ${flagOwnerName||"the person who flagged this"} or an Admin can remove the ${flagLabel} flag.`,"#dc2626");
+      return;
+    }
+  }
+
+  const newVal=!isFlagOn;
+  const updates={[localFlag]:newVal};
   if(newVal){
-    // Flag turned ON — expand its group
-    collapsed.delete(groupKey);
-  } else {
-    // Flag turned OFF — check if that group is now empty; if so collapse it
+    // Turning ON — record who flagged
+    updates[localById]=currentUser?.id||null;
+    updates[localByName]=currentName||"";
+  }else{
+    // Turning OFF — clear the owner
+    updates[localById]=null;
+    updates[localByName]="";
+  }
+
+  updL(pid,updates);
+  if(newVal){collapsed.delete(groupKey);}
+  else{
     const stillInGroup=S.patients.filter(x=>x.id!==pid).some(x=>isPriority?x.highPriority:x.isUrgent);
     if(!stillInGroup)collapsed.add(groupKey);
   }
   renderMain();renderSidebar();
-  const {error}=await db.from("patients").update({[dbField]:newVal,updated_at:new Date().toISOString()}).eq("id",pid);
+
+  const dbUpdates={[dbFlag]:newVal,[dbById]:newVal?(currentUser?.id||null):null,[dbByName]:newVal?(currentName||""):"",updated_at:new Date().toISOString()};
+  const {error}=await db.from("patients").update(dbUpdates).eq("id",pid);
   if(error){
-    updL(pid,{[localField]:!newVal});renderMain();renderSidebar();
+    // Roll back
+    const rollback={[localFlag]:isFlagOn,[localById]:flagOwner,[localByName]:flagOwnerName};
+    updL(pid,rollback);renderMain();renderSidebar();
     toast("Failed to update flag: "+error.message,"#dc2626");
   }
 }
@@ -1064,8 +1123,8 @@ async function saveNote(pid,draftF,histF){
   const tracked=["physicianHistory","roundHistory","ptHistory","otHistory","slpHistory"];
   if(tracked.includes(histF)){
     const removedFlags=[];
-    if(p.highPriority){changes.highPriority=false;await db.from("patients").update({high_priority:false,updated_at:new Date().toISOString()}).eq("id",pid);removedFlags.push("🚩 Priority");}
-    if(p.isUrgent){changes.isUrgent=false;await db.from("patients").update({is_urgent:false,updated_at:new Date().toISOString()}).eq("id",pid);removedFlags.push("🔴 Urgent");}
+    if(p.highPriority){changes.highPriority=false;changes.priorityById=null;changes.priorityByName="";await db.from("patients").update({high_priority:false,priority_by:null,priority_by_name:"",updated_at:new Date().toISOString()}).eq("id",pid);removedFlags.push("🚩 Priority");}
+    if(p.isUrgent){changes.isUrgent=false;changes.urgentById=null;changes.urgentByName="";await db.from("patients").update({is_urgent:false,urgent_by:null,urgent_by_name:"",updated_at:new Date().toISOString()}).eq("id",pid);removedFlags.push("🔴 Urgent");}
     if(removedFlags.length>0){flagRemoved=true;toast(`${removedFlags.join(" & ")} flag${removedFlags.length>1?"s":""} removed — note saved.`,"#9b2335");}
   }
   updL(pid,changes);renderMain();renderSidebar();
