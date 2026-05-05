@@ -311,6 +311,21 @@ details[open] .prev-notes-summary::before{content:"▼ ";}
 .arc-empty{padding:32px 20px;text-align:center;color:var(--mu);font-size:13px;}
 .btn-restore{padding:6px 16px;border-radius:8px;border:1.5px solid #86efac;background:#f0fdf4;color:#166534;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;font-family:var(--font);}
 .btn-restore:hover{background:#dcfce7;}
+.rq-btn{padding:3px 8px;border-radius:6px;border:1px solid #86efac;background:#f0fdf4;color:#166534;font-size:12px;font-weight:700;}
+.rq-btn:hover{background:#dcfce7;}
+.qn-hdr{background:linear-gradient(135deg,var(--deep),var(--mid));padding:12px 16px;display:flex;align-items:center;justify-content:space-between;}
+.qn-title{font-size:14px;font-weight:700;color:#fff;}
+.qn-close{background:rgba(255,255,255,0.18);border:none;border-radius:7px;color:#fff;font-size:18px;width:28px;height:28px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.qn-body{padding:14px 16px;display:flex;flex-direction:column;gap:10px;}
+.qn-type-row{display:flex;gap:6px;flex-wrap:wrap;}
+.qn-type-btn{padding:4px 12px;border-radius:20px;border:1.5px solid #edcacf;background:#fdf8f8;color:var(--mu);font-size:11px;font-weight:600;cursor:pointer;}
+.qn-type-btn.active{background:linear-gradient(135deg,var(--deep),var(--mid));border-color:var(--mid);color:#fff;}
+.template-chips{display:flex;gap:6px;flex-wrap:wrap;}
+.tmpl-chip{padding:4px 11px;border-radius:20px;border:1px solid #edcacf;background:#fdf0f1;color:var(--mid);font-size:11px;font-weight:600;cursor:pointer;transition:all 0.12s;}
+.tmpl-chip:hover{background:var(--soft);border-color:var(--mid);}
+.qn-ta{width:100%;min-height:90px;padding:10px 12px;border-radius:9px;border:1.5px solid #edcacf;outline:none;resize:vertical;font-size:13px;color:var(--tm);background:#fdf8f8;line-height:1.7;font-family:var(--font);}
+.qn-ta:focus{border-color:var(--mid);box-shadow:0 0 0 3px rgba(155,35,53,0.1);}
+.qn-footer{display:flex;justify-content:flex-end;gap:8px;}
 /* USER MANAGEMENT */
 .user-table{width:100%;border-collapse:collapse;}
 .user-table th{font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:0.07em;padding:10px 16px;text-align:left;background:#fdf0f1;border-bottom:1px solid #f5d5d8;}
@@ -434,6 +449,7 @@ details[open] .prev-notes-summary::before{content:"▼ ";}
 
 <div id="toast"></div>
 <div id="notif-panel" class="notif-panel" style="display:none"></div>
+<div id="quick-note-panel" style="display:none;position:fixed;bottom:24px;left:320px;width:min(380px,calc(100vw - 340px));background:#fff;border-radius:16px;box-shadow:0 12px 40px rgba(123,31,46,0.22);border:1px solid #f0cdd1;z-index:2500;overflow:hidden;"></div>
 <div id="loader"><div class="loader-box"><div class="spin"></div><span id="loader-msg">Loading…</span></div></div>
 <div id="modal-overlay" class="modal-overlay" style="display:none" onclick="handleOverlayClick(event)"><div id="modal-content"></div></div>
 
@@ -783,6 +799,7 @@ function renderSidebar(){
       canManagePatients() ? `<button class="re-btn" onclick="event.stopPropagation();openEditModal('${p.id}')">✏️</button>` : "",
       canManagePatients() ? `<button class="ra-btn" onclick="event.stopPropagation();openArcConfirm('${p.id}')">Archive</button>` : "",
       canDeletePatients() ? `<button class="rd-btn" onclick="event.stopPropagation();openDelConfirm('${p.id}')">🗑️</button>` : "",
+      canWriteNotes() ? `<button class="rq-btn" onclick="event.stopPropagation();openQuickNote('${p.id}')">📝</button>` : "",
     ].join("");
     const wardTag=showWard?`<span class="${wbc(p.ward)}" style="font-size:10px;padding:1px 6px;border-radius:4px;margin-left:2px">${esc(p.ward||"Ward A")}</span>`:"";
     return `<div class="pat-row${isAct?" active":""}" onclick="selPat('${p.id}')">
@@ -1065,6 +1082,7 @@ function rNS(p,type,icon,title,placeholder,replies){
   return `<div class="note-card">
     <div class="note-hdr"><span>${icon}</span><span class="note-hdr-lbl">${title}</span>
       ${hist.length>0?`<span class="note-cnt">${hist.length} saved ${hist.length===1?"note":"notes"}</span>`:""}
+      ${canWriteNotes()&&NOTE_TEMPLATES[type]?.length?`<button class="ne-btn ne-view" style="margin-left:auto" onclick="openTemplateMenu('${type}','${p.id}')">📋 Templates</button>`:""}
     </div>
     <div class="note-input-area">
       ${canWriteNotes()?`<textarea class="note-ta" placeholder="${placeholder}" oninput="onNI('${p.id}','${dk}',this)" id="nta-${type}-${p.id}">${esc(draft)}</textarea>
@@ -1073,6 +1091,138 @@ function rNS(p,type,icon,title,placeholder,replies){
       </div>`:`<p style="padding:10px 0 12px;font-size:12px;color:var(--mu);font-style:italic">View only — your role cannot add notes.</p>`}
     </div>${hHTML}
   </div>`;
+}
+
+// ═══════════════════════════════════════
+//  NOTE TEMPLATES
+// ═══════════════════════════════════════
+const NOTE_TEMPLATES={
+  physician:[
+    {label:"New Orders",text:"New physician orders:\n- "},
+    {label:"Medication Change",text:"Medication change:\n- Discontinue: \n- Start: \n- Reason: "},
+    {label:"Consult Request",text:"Consult requested:\n- Specialty: \n- Reason: \n- Urgency: "},
+    {label:"Diet Change",text:"Diet order updated:\n- Previous: \n- New order: \n- Reason: "},
+  ],
+  round:[
+    {label:"Routine Round",text:"Patient seen during rounds.\n- General condition: Stable\n- Complaints: None\n- Plan: Continue current management"},
+    {label:"Refused Therapy",text:"Patient refused therapy session today.\n- Reason given: \n- Plan: Re-attempt tomorrow"},
+    {label:"Family Meeting",text:"Family meeting held.\n- Attendees: \n- Topics discussed: \n- Goals reviewed: \n- Follow-up: "},
+    {label:"Improving",text:"Patient showing improvement.\n- Area of improvement: \n- Current status: \n- Updated goals: "},
+    {label:"Deteriorating",text:"Patient condition deteriorating.\n- Observed changes: \n- Actions taken: \n- Physician notified: "},
+  ],
+  pt:[
+    {label:"Session Done",text:"PT session completed.\n- Activities: \n- Tolerance: Good / Fair / Poor\n- Progress: \n- Plan for next session: "},
+    {label:"Refused",text:"Patient refused PT session.\n- Reason: \n- Plan: "},
+    {label:"Bed Rest",text:"Patient on bed rest today. PT session deferred.\n- Reason for bed rest: \n- Expected duration: "},
+    {label:"Goal Met",text:"Therapy goal achieved.\n- Goal: \n- New goal: "},
+  ],
+  ot:[
+    {label:"Session Done",text:"OT session completed.\n- Activities: \n- ADL performance: \n- Tolerance: Good / Fair / Poor\n- Plan: "},
+    {label:"Refused",text:"Patient refused OT session.\n- Reason: \n- Plan: "},
+    {label:"Splint Applied",text:"Splint applied today.\n- Type: \n- Position: \n- Schedule: \n- Patient educated: Yes / No"},
+    {label:"Goal Met",text:"OT goal achieved.\n- Goal: \n- New goal: "},
+  ],
+  slp:[
+    {label:"Session Done",text:"SLP session completed.\n- Areas addressed: \n- Performance: \n- Tolerance: Good / Fair / Poor\n- Plan: "},
+    {label:"Refused",text:"Patient refused SLP session.\n- Reason: \n- Plan: "},
+    {label:"Diet Recommendation",text:"Dietary texture recommendation:\n- Solids: \n- Liquids: \n- Rationale: "},
+    {label:"Goal Met",text:"SLP goal achieved.\n- Goal: \n- New goal: "},
+  ],
+};
+
+// ── QUICK NOTE ──────────────────────────────────────────────
+let qnPatientId=null;
+let qnType="round";
+
+function openQuickNote(pid){
+  qnPatientId=pid;qnType="round";
+  const p=S.patients.find(x=>x.id===pid);if(!p)return;
+  const panel=document.getElementById("quick-note-panel");if(!panel)return;
+  renderQuickNote(p);
+  panel.style.display="block";
+  setTimeout(()=>document.getElementById("qn-ta")?.focus(),50);
+}
+
+function closeQuickNote(){
+  document.getElementById("quick-note-panel").style.display="none";
+  qnPatientId=null;
+}
+
+function renderQuickNote(p){
+  const types=[
+    {key:"physician",label:"🩺 Physician"},
+    {key:"round",label:"📝 Round"},
+    {key:"pt",label:"🦵 PT"},
+    {key:"ot",label:"🖐️ OT"},
+    {key:"slp",label:"🗣️ SLP"},
+  ];
+  const typeBtns=types.map(t=>`<button class="qn-type-btn${qnType===t.key?" active":""}" onclick="setQnType('${t.key}','${p.id}')">${t.label}</button>`).join("");
+  const tmpls=(NOTE_TEMPLATES[qnType]||[]).map(t=>`<button class="tmpl-chip" onclick="applyTemplate(${JSON.stringify(t.text).replace(/'/g,"&#39;")})">${t.label}</button>`).join("");
+  document.getElementById("quick-note-panel").innerHTML=`
+    <div class="qn-hdr">
+      <span class="qn-title">📝 Quick Note — Room ${esc(p.room)} ${esc(maskName(p.name||""))}</span>
+      <button class="qn-close" onclick="closeQuickNote()">×</button>
+    </div>
+    <div class="qn-body">
+      <div class="qn-type-row">${typeBtns}</div>
+      <div>
+        <div style="font-size:10px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:6px">Templates</div>
+        <div class="template-chips">${tmpls}</div>
+      </div>
+      <textarea class="qn-ta" id="qn-ta" placeholder="Type note or pick a template above…"></textarea>
+      <div class="qn-footer">
+        <button class="btn-cancel" onclick="closeQuickNote()">Cancel</button>
+        <button class="btn-primary" onclick="saveQuickNote()">Save Note</button>
+      </div>
+    </div>`;
+}
+
+function setQnType(type,pid){
+  qnType=type;
+  const p=S.patients.find(x=>x.id===pid);if(p)renderQuickNote(p);
+  setTimeout(()=>document.getElementById("qn-ta")?.focus(),30);
+}
+
+function applyTemplate(text){
+  const ta=document.getElementById("qn-ta");if(!ta)return;
+  ta.value=text;ta.focus();
+  ta.setSelectionRange(ta.value.length,ta.value.length);
+}
+
+async function saveQuickNote(){
+  const ta=document.getElementById("qn-ta");if(!ta)return;
+  const text=ta.value.trim();if(!text){toast("Please write a note first.","#dc2626");return;}
+  const pid=qnPatientId;const p=S.patients.find(x=>x.id===pid);if(!p)return;
+  const draftF=qnType+"Notes";const histF=qnType+"History";
+  // Temporarily set the draft so saveNote can pick it up
+  updL(pid,{[draftF]:text});
+  closeQuickNote();
+  await saveNote(pid,draftF,histF);
+  // Switch main view to that patient
+  if(S.selected!==pid){selPat(pid);}
+}
+
+// ── NOTE TEMPLATES (in main note textareas) ──────────────────
+function openTemplateMenu(type,pid){
+  const tmpls=NOTE_TEMPLATES[type]||[];if(!tmpls.length)return;
+  const items=tmpls.map(t=>`<div class="tmpl-chip" style="display:block;margin-bottom:6px;text-align:left" onclick="applyNoteTemplate('${type}','${pid}',${JSON.stringify(t.text).replace(/'/g,"&#39;")})">${t.label}</div>`).join("");
+  showModal(`
+    <div class="modal-head"><span class="modal-title">📋 Note Templates</span><button class="modal-close" onclick="closeModal()">×</button></div>
+    <div class="modal-body" style="gap:8px">
+      <div style="font-size:12px;color:var(--mu)">Select a template to pre-fill the note area.</div>
+      ${items}
+    </div>`);
+}
+
+function applyNoteTemplate(type,pid,text){
+  closeModal();
+  const ta=document.getElementById(`nta-${type}-${pid}`);if(!ta)return;
+  ta.value=text;
+  // Trigger the oninput logic to activate the Save button
+  updL(pid,{[type+"Notes"]:text});
+  const btn=document.getElementById(`nsb-${type}-${pid}`);
+  if(btn)btn.className="note-save-btn"+(text.trim().length>0?" active":"");
+  ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length);
 }
 
 // ═══════════════════════════════════════
