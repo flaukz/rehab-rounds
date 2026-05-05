@@ -704,6 +704,7 @@ async function loadStaffDir(){
   }));
 }
 
+const p2l=(p,nm)=>({
   id:p.id,room:p.room,name:p.name,mrn:p.mrn,
   primaryPt:p.primary_pt||"",primaryOt:p.primary_ot||"",primarySlp:p.primary_slp||"",
   ptPhone:p.pt_phone||"",otPhone:p.ot_phone||"",slpPhone:p.slp_phone||"",
