@@ -376,7 +376,7 @@ input,select,textarea{font-family:var(--font);}
     <div class="hdr-actions">
       <button class="hdr-btn" onclick="openArchiveModal()">🗄️ Archive <span class="badge" id="arc-count" style="display:none"></span></button>
       <button class="hdr-btn" id="hdr-privacy-btn" onclick="togPrivacy()" title="Toggle patient confidentiality mode">🔓 Privacy</button>
-      <button class="hdr-btn" id="hdr-admin-btn" onclick="openAdminPanel()" style="display:none">👑 Users</button>
+      <button class="hdr-btn" id="hdr-admin-btn" onclick="openAdminPanel('users')" style="display:none">👑 Admin</button>
       <button class="hdr-btn" id="hdr-notif-btn" onclick="openNotifPanel()" title="Reply notifications" style="position:relative">
         🔔 <span id="notif-badge" style="position:absolute;top:-5px;right:-5px;background:#dc2626;color:#fff;font-size:10px;font-weight:700;border-radius:50%;width:18px;height:18px;display:none;align-items:center;justify-content:center;line-height:1">0</span>
       </button>
@@ -431,6 +431,7 @@ const DEF_CHK = {stable:false,unstable:false,bariatricWheelchair:false,comfortWh
 // ═══════════════════════════════════════
 let S = { patients:[], archive:[], selected:null, search:"" };
 let currentUser=null, currentName="", currentRole="pending";
+let staffDir=[]; // [{userId, fullName, discipline, phone}] — loaded on login
 const isAdmin        = ()=>currentRole==="admin";
 const canManagePatients = ()=>["admin","admin_officer"].includes(currentRole);
 const canDeletePatients = ()=>currentRole==="admin";
@@ -634,6 +635,7 @@ async function onLogin(user){
 
   loader("Loading patients…");
   await loadAll();
+  await loadStaffDir();
   noloader();
   await loadNotifications();
   startRealtimeNotifications();
@@ -692,7 +694,16 @@ async function loadAll(){
   // Collapse all groups on every load
   initCollapsed();
 }
-const p2l=(p,nm)=>({
+async function loadStaffDir(){
+  const {data}=await db.from("user_roles")
+    .select("user_id,full_name,discipline,phone")
+    .neq("role","pending")
+    .order("full_name");
+  staffDir=(data||[]).filter(u=>u.full_name&&u.discipline).map(u=>({
+    userId:u.user_id,fullName:u.full_name,discipline:u.discipline||"",phone:u.phone||"",
+  }));
+}
+
   id:p.id,room:p.room,name:p.name,mrn:p.mrn,
   primaryPt:p.primary_pt||"",primaryOt:p.primary_ot||"",primarySlp:p.primary_slp||"",
   ptPhone:p.pt_phone||"",otPhone:p.ot_phone||"",slpPhone:p.slp_phone||"",
@@ -1271,9 +1282,37 @@ function openEditModal(id){
 }
 
 function patForm(p){
-  const ie=!!p,v=p||{room:"",name:"",mrn:"",primaryPt:"",primaryOt:"",primarySlp:"",classification:"ABM",highPriority:false,isUrgent:false,ward:"Ward A"};
+  const ie=!!p,v=p||{room:"",name:"",mrn:"",primaryPt:"",primaryOt:"",primarySlp:"",ptPhone:"",otPhone:"",slpPhone:"",classification:"ABM",highPriority:false,isUrgent:false,ward:"Ward A"};
   const opts=CLSS.map(c=>`<option value="${c}"${c===v.classification?" selected":""}>${c}</option>`).join("");
   const wOpts=WARDS.map(w=>`<option value="${w.id}"${w.id===(v.ward||"Ward A")?" selected":""}>${w.label}</option>`).join("");
+  const canAssign=canManagePatients();
+  const therapistOpts=(disc,cur)=>{
+    const members=staffDir.filter(s=>s.discipline===disc);
+    const blankOpt=`<option value="">— Select ${disc} —</option>`;
+    const opts=members.map(s=>`<option value="${esc(s.fullName)}"${s.fullName===cur?" selected":""}>${esc(s.fullName)}</option>`).join("");
+    const inDir=members.some(s=>s.fullName===cur);
+    const manualOpt=cur&&!inDir?`<option value="${esc(cur)}" selected>${esc(cur)} (manual)</option>`:"";
+    return blankOpt+opts+manualOpt;
+  };
+  const therapistField=(disc,fieldId,phoneId,cur,phone)=>{
+    if(canAssign){
+      return `<div class="g2">
+        <div><label class="fl">Primary ${disc}</label>
+          <select class="fi" id="${fieldId}" onchange="onTherapistChange('${fieldId.replace('f','')}')"><${therapistOpts(disc,cur)}</select>
+        </div>
+        <div><label class="fl">${disc} WhatsApp No.</label><input class="fi" id="${phoneId}" value="${esc(phone||"")}" placeholder="Auto-filled from directory"/></div>
+      </div>`;
+    }else{
+      return `<div class="g2">
+        <div><label class="fl">Primary ${disc}</label>
+          <input class="fi" id="${fieldId}" value="${esc(cur||"")}" readonly style="background:#f5f5f5;color:var(--mu);cursor:not-allowed;" title="Only Admin or Admin Officer can assign therapists"/>
+        </div>
+        <div><label class="fl">${disc} WhatsApp No.</label>
+          <input class="fi" id="${phoneId}" value="${esc(phone||"")}" readonly style="background:#f5f5f5;color:var(--mu);cursor:not-allowed;"/>
+        </div>
+      </div>`;
+    }
+  };
   return `<div class="modal-head"><span class="modal-title">${ie?"✏️ Edit Patient":"➕ Add Patient"}</span><button class="modal-close" onclick="closeModal()">×</button></div>
   <div class="modal-body">
     <div class="g2">
@@ -1281,17 +1320,9 @@ function patForm(p){
       <div><label class="fl">MRN</label><input class="fi" id="fm" value="${esc(v.mrn)}" placeholder="e.g. MRN-001234"/></div>
     </div>
     <div><label class="fl">Patient Name</label><input class="fi" id="fn" value="${esc(v.name)}" placeholder="Full name"/></div>
-    <div class="g2">
-      <div><label class="fl">Primary PT</label><input class="fi" id="fpt" value="${esc(v.primaryPt||"")}" placeholder="e.g. Dr. Rivera"/></div>
-      <div><label class="fl">PT WhatsApp No.</label><input class="fi" id="fptph" value="${esc(v.ptPhone||"")}" placeholder="e.g. 971501234567"/></div>
-    </div>
-    <div class="g2">
-      <div><label class="fl">Primary OT</label><input class="fi" id="fot" value="${esc(v.primaryOt||"")}" placeholder="e.g. Dr. Kim"/></div>
-      <div><label class="fl">OT WhatsApp No.</label><input class="fi" id="fotph" value="${esc(v.otPhone||"")}" placeholder="e.g. 971501234567"/></div>
-    </div>
-    <div class="g2">
-      <div><label class="fl">Primary SLP</label><input class="fi" id="fslp" value="${esc(v.primarySlp||"")}" placeholder="e.g. Dr. Patel"/></div>
-      <div><label class="fl">SLP WhatsApp No.</label><input class="fi" id="fslpph" value="${esc(v.slpPhone||"")}" placeholder="e.g. 971501234567"/></div>
+    ${therapistField("PT","fpt","fptph",v.primaryPt||"",v.ptPhone||"")}
+    ${therapistField("OT","fot","fotph",v.primaryOt||"",v.otPhone||"")}
+    ${therapistField("SLP","fslp","fslpph",v.primarySlp||"",v.slpPhone||"")}
     </div>
     <div class="g2">
       <div><label class="fl">Ward</label><select class="fi" id="fw">${wOpts}</select></div>
@@ -1321,13 +1352,36 @@ function buildWALink(p,role,name,phone){
   const clean=phone.replace(/\D/g,"");
   return `https://wa.me/${clean}?text=${encodeURIComponent(msg)}`;
 }
+function onTherapistChange(role){
+  const nameEl=document.getElementById("f"+role);
+  const phoneEl=document.getElementById("f"+role+"ph");
+  if(!nameEl||!phoneEl)return;
+  const name=nameEl.value;
+  const staff=staffDir.find(s=>s.fullName===name);
+  if(staff&&staff.phone){
+    phoneEl.value=staff.phone;
+    phoneEl.style.background="#f0fdf4";
+    phoneEl.title="Auto-filled from Staff Directory";
+  }else if(!staff){
+    phoneEl.value="";
+    phoneEl.style.background="";
+    phoneEl.title="";
+  }
+}
+
 function togP(){const i=document.getElementById("fp"),b=document.getElementById("fpb"),l=document.getElementById("fpl");const o=i.value==="1";i.value=o?"0":"1";b.className="ptoggle"+(o?"":" on");l.textContent=o?"Normal":"Priority";}
 function togU(){const i=document.getElementById("fu"),b=document.getElementById("fub"),l=document.getElementById("ful");const o=i.value==="1";i.value=o?"0":"1";b.className="utoggle"+(o?"":" on");l.textContent=o?"Normal":"Urgent";}
 
 async function subPat(eid){
   const room=document.getElementById("fr").value.trim(),mrn=document.getElementById("fm").value.trim(),name=document.getElementById("fn").value.trim();
-  const primaryPt=document.getElementById("fpt").value.trim(),primaryOt=document.getElementById("fot").value.trim(),primarySlp=document.getElementById("fslp").value.trim();
-  const ptPhone=document.getElementById("fptph").value.trim(),otPhone=document.getElementById("fotph").value.trim(),slpPhone=document.getElementById("fslpph").value.trim();
+  // Only Admin/Admin Officer can assign therapists
+  const existingPat=S.patients.find(x=>x.id===(eid==="null"?null:eid));
+  const primaryPt=canManagePatients()?document.getElementById("fpt").value.trim():(existingPat?.primaryPt||"");
+  const primaryOt=canManagePatients()?document.getElementById("fot").value.trim():(existingPat?.primaryOt||"");
+  const primarySlp=canManagePatients()?document.getElementById("fslp").value.trim():(existingPat?.primarySlp||"");
+  const ptPhone=canManagePatients()?document.getElementById("fptph").value.trim():(existingPat?.ptPhone||"");
+  const otPhone=canManagePatients()?document.getElementById("fotph").value.trim():(existingPat?.otPhone||"");
+  const slpPhone=canManagePatients()?document.getElementById("fslpph").value.trim():(existingPat?.slpPhone||"");
   const cls=document.getElementById("fc").value,ward=document.getElementById("fw").value;
   const hp=document.getElementById("fp").value==="1",isUrgent=document.getElementById("fu").value==="1";
   if(!room){toast("Room number is required.","#dc2626");return;}
@@ -1418,77 +1472,54 @@ async function restorePat(id){
 const ROLE_LABELS={"pending":"⏳ Pending","user":"👤 User","admin_officer":"🔷 Admin Officer","admin":"👑 Admin"};
 const ROLE_PILLS={"pending":"rp-pending","user":"rp-user","admin_officer":"rp-admin_officer","admin":"rp-admin"};
 
-async function openAdminPanel(){
+async function openAdminPanel(tab){
+  tab=tab||"users";
   if(!isAdmin()){toast("Admin access only.","#dc2626");return;}
-  loader("Loading users…");
-  const {data:users,error}=await db.from("user_roles").select("*").order("created_at");
+  loader("Loading…");
+  const [ur,sr]=await Promise.all([
+    db.from("user_roles").select("*").order("created_at"),
+    db.from("user_roles").select("user_id,full_name,discipline,phone").neq("role","pending").order("full_name"),
+  ]);
   noloader();
-  if(error){toast("Failed to load users: "+error.message,"#dc2626");return;}
-
-  const all=(users||[]).slice().sort((a,b)=>{
-    const order={pending:0,user:1,admin_officer:2,admin:3};
-    return (order[a.role]??9)-(order[b.role]??9);
-  });
+  if(ur.error){toast("Failed to load: "+ur.error.message,"#dc2626");return;}
+  staffDir=(sr.data||[]).filter(u=>u.full_name).map(u=>({userId:u.user_id,fullName:u.full_name,discipline:u.discipline||"",phone:u.phone||""}));
+  const all=(ur.data||[]).slice().sort((a,b)=>{const o={pending:0,user:1,admin_officer:2,admin:3};return (o[a.role]??9)-(o[b.role]??9);});
   const pending=all.filter(u=>u.role==="pending");
   const fmtDate=iso=>{if(!iso)return"—";return new Date(iso).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});};
-
-  const pendingBanner=pending.length>0
-    ?`<div class="pending-banner">⏳ <strong>${pending.length} user${pending.length!==1?"s":""} waiting for approval</strong></div>`:"";
-
-  const rows=all.map(u=>{
-    const isMe=u.user_id===currentUser?.id;
-    const role=u.role||"pending";
+  const pendingBanner=pending.length>0?`<div class="pending-banner">⏳ <strong>${pending.length} user${pending.length!==1?"s":""} waiting for approval</strong></div>`:"";
+  const userRows=all.map(u=>{
+    const isMe=u.user_id===currentUser?.id,role=u.role||"pending";
     const pill=`<span class="role-pill ${ROLE_PILLS[role]||"rp-pending"}">${ROLE_LABELS[role]||role}</span>`;
     const phoneDisplay=u.phone?`<div style="font-size:11px;color:var(--mu);margin-top:2px">📱 ${esc(u.phone)}</div>`:`<div style="font-size:11px;color:#ccc;margin-top:2px">No mobile</div>`;
     let actions="";
-    if(isMe){
-      actions=`<span style="font-size:11px;color:var(--mu);font-style:italic">You</span>`;
-    }else if(role==="pending"){
-      actions=`
-        <button class="ua-btn ua-approve" onclick="changeRole('${u.user_id}','user')">✅ Approve</button>
-        <button class="ua-btn ua-reject" onclick="rejectUser('${u.user_id}','${esc(u.full_name||"this user")}')">✕ Reject</button>`;
-    }else if(role==="user"){
-      actions=`
-        <button class="ua-btn ua-promote" onclick="changeRole('${u.user_id}','admin_officer')">→ Admin Officer</button>
-        <button class="ua-btn ua-promote" style="border-color:#f59e0b;background:#fffbeb;color:#92400e" onclick="changeRole('${u.user_id}','admin')">→ Admin</button>`;
-    }else if(role==="admin_officer"){
-      actions=`
-        <button class="ua-btn ua-promote" style="border-color:#f59e0b;background:#fffbeb;color:#92400e" onclick="changeRole('${u.user_id}','admin')">→ Admin</button>
-        <button class="ua-btn ua-demote" onclick="changeRole('${u.user_id}','user')">→ User</button>`;
-    }else if(role==="admin"){
-      actions=`
-        <button class="ua-btn ua-demote" onclick="changeRole('${u.user_id}','admin_officer')">→ Admin Officer</button>
-        <button class="ua-btn ua-demote" onclick="changeRole('${u.user_id}','user')">→ User</button>`;
-    }
-    return `<tr>
-      <td>
-        <strong>${esc(u.full_name||"—")}</strong>${isMe?' <span style="font-size:10px;color:var(--mu)">(you)</span>':""}
-        ${phoneDisplay}
-      </td>
-      <td>${pill}</td>
-      <td style="font-size:11px;color:var(--fa)">${fmtDate(u.created_at)}</td>
-      <td>
-        <div style="display:flex;flex-wrap:wrap;gap:2px;margin-bottom:4px">${actions}</div>
-        <button class="ua-btn" style="border-color:#93c5fd;background:#eff6ff;color:#1d4ed8;width:100%;text-align:center" onclick="editUserPhone('${u.user_id}','${esc(u.phone||"")}','${esc(u.full_name||"")}')">📱 Edit Mobile</button>
-      </td>
-    </tr>`;
+    if(isMe){actions=`<span style="font-size:11px;color:var(--mu);font-style:italic">You</span>`;}
+    else if(role==="pending"){actions=`<button class="ua-btn ua-approve" onclick="changeRole('${u.user_id}','user')">✅ Approve</button><button class="ua-btn ua-reject" onclick="rejectUser('${u.user_id}','${esc(u.full_name||"this user")}')">✕ Reject</button>`;}
+    else if(role==="user"){actions=`<button class="ua-btn ua-promote" onclick="changeRole('${u.user_id}','admin_officer')">→ Admin Officer</button><button class="ua-btn ua-promote" style="border-color:#f59e0b;background:#fffbeb;color:#92400e" onclick="changeRole('${u.user_id}','admin')">→ Admin</button>`;}
+    else if(role==="admin_officer"){actions=`<button class="ua-btn ua-promote" style="border-color:#f59e0b;background:#fffbeb;color:#92400e" onclick="changeRole('${u.user_id}','admin')">→ Admin</button><button class="ua-btn ua-demote" onclick="changeRole('${u.user_id}','user')">→ User</button>`;}
+    else if(role==="admin"){actions=`<button class="ua-btn ua-demote" onclick="changeRole('${u.user_id}','admin_officer')">→ Admin Officer</button><button class="ua-btn ua-demote" onclick="changeRole('${u.user_id}','user')">→ User</button>`;}
+    return `<tr><td><strong>${esc(u.full_name||"—")}</strong>${isMe?' <span style="font-size:10px;color:var(--mu)">(you)</span>':""}${phoneDisplay}</td><td>${pill}</td><td style="font-size:11px;color:var(--fa)">${fmtDate(u.created_at)}</td><td><div style="display:flex;flex-wrap:wrap;gap:2px;margin-bottom:4px">${actions}</div><button class="ua-btn" style="border-color:#93c5fd;background:#eff6ff;color:#1d4ed8;width:100%;text-align:center" onclick="editUserPhone('${u.user_id}','${esc(u.phone||"")}','${esc(u.full_name||"")}')">📱 Edit Mobile</button></td></tr>`;
   }).join("");
-
+  const DISCS=["PT","OT","SLP","Physician","Other"];
+  const eligible=all.filter(u=>u.role!=="pending"&&u.full_name);
+  const staffRows=eligible.map(u=>{
+    const disc=u.discipline||"";
+    const discOpts=`<option value="">— None —</option>`+DISCS.map(d=>`<option value="${d}"${d===disc?" selected":""}>${d}</option>`).join("");
+    return `<tr><td><strong>${esc(u.full_name||"—")}</strong><div style="font-size:11px;color:var(--mu)">${esc(u.phone||"No mobile")}</div></td><td><span class="role-pill ${ROLE_PILLS[u.role]||"rp-user"}">${ROLE_LABELS[u.role]||u.role}</span></td><td><select class="fi" style="font-size:12px;padding:5px 8px" onchange="saveUserDiscipline('${u.user_id}',this.value)">${discOpts}</select></td></tr>`;
+  }).join("");
+  const ts=(t)=>t===tab?"padding:10px 22px;border:none;border-bottom:3px solid #9b2335;background:transparent;font-weight:700;color:#7b1f2e;font-size:13px;cursor:pointer;":"padding:10px 22px;border:none;border-bottom:3px solid transparent;background:transparent;font-weight:600;color:#9b6670;font-size:13px;cursor:pointer;";
   showModal(`
-    <div class="modal-head">
-      <span class="modal-title">👑 User Management</span>
-      <button class="modal-close" onclick="closeModal()">×</button>
+    <div class="modal-head"><span class="modal-title">👑 Admin Panel</span><button class="modal-close" onclick="closeModal()">×</button></div>
+    <div style="display:flex;border-bottom:1px solid #f5d5d8;background:#fdf8f8;padding:0 8px;">
+      <button style="${ts("users")}" onclick="openAdminPanel('users')">👥 Users</button>
+      <button style="${ts("staff")}" onclick="openAdminPanel('staff')">🏥 Staff Directory</button>
     </div>
-    <div style="padding:12px 20px;background:#fdf0f1;border-bottom:1px solid #f5d5d8;font-size:12px;color:#9b2335;">
-      ${pendingBanner}
-      <strong>${all.length}</strong> registered user${all.length!==1?"s":""}. Role changes take effect on next sign-in.
-    </div>
-    <div style="overflow:auto;max-height:60vh;">
-      <table class="user-table">
-        <thead><tr><th>Name & Mobile</th><th>Role</th><th>Joined</th><th>Actions</th></tr></thead>
-        <tbody>${rows.length?rows:`<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--fa)">No users found.</td></tr>`}</tbody>
-      </table>
-    </div>
+    ${tab==="users"?`
+    <div style="padding:10px 20px;background:#fdf0f1;border-bottom:1px solid #f5d5d8;font-size:12px;color:#9b2335;">${pendingBanner}<strong>${all.length}</strong> registered user${all.length!==1?"s":""}. Role changes take effect on next sign-in.</div>
+    <div style="overflow:auto;max-height:55vh;"><table class="user-table"><thead><tr><th>Name & Mobile</th><th>Role</th><th>Joined</th><th>Actions</th></tr></thead><tbody>${userRows||`<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--fa)">No users found.</td></tr>`}</tbody></table></div>
+    `:`
+    <div style="padding:10px 20px;background:#fdf0f1;border-bottom:1px solid #f5d5d8;font-size:12px;color:#9b2335;">Assign disciplines to staff. When assigned to a patient, their mobile auto-fills.</div>
+    <div style="overflow:auto;max-height:55vh;"><table class="user-table"><thead><tr><th>Name & Mobile</th><th>Role</th><th>Discipline</th></tr></thead><tbody>${staffRows||`<tr><td colspan="3" style="text-align:center;padding:24px;color:var(--fa)">No approved users yet.</td></tr>`}</tbody></table></div>
+    `}
   `,false,true);
 }
 
@@ -1499,7 +1530,17 @@ async function changeRole(userId,newRole){
   noloader();
   if(error){toast("Failed: "+error.message,"#dc2626");return;}
   toast(`Role updated to ${ROLE_LABELS[newRole]} ✓`,"#16a34a");
-  openAdminPanel();
+  openAdminPanel('users');
+}
+
+async function saveUserDiscipline(userId,discipline){
+  const {error}=await db.from("user_roles").update({discipline}).eq("user_id",userId);
+  if(error){toast("Failed to save discipline: "+error.message,"#dc2626");return;}
+  // Refresh local staff directory
+  const entry=staffDir.find(s=>s.userId===userId);
+  if(entry)entry.discipline=discipline;
+  else await loadStaffDir();
+  toast("Discipline saved ✓","#16a34a");
 }
 
 function rejectUser(userId,name){
@@ -1509,7 +1550,7 @@ function rejectUser(userId,name){
     <div class="conf-msg"><strong>${esc(name)}</strong>'s account will be permanently deleted.</div>
     <div class="conf-sub">They will not be able to sign in with this account.</div>
     <div class="modal-acts" style="width:100%">
-      <button class="btn-cancel" onclick="openAdminPanel()">Cancel</button>
+      <button class="btn-cancel" onclick="openAdminPanel('users')">Cancel</button>
       <button class="btn-danger" onclick="confirmReject('${userId}')">Reject & Delete</button>
     </div>
   </div>`);
@@ -1517,7 +1558,7 @@ function rejectUser(userId,name){
 
 function editUserPhone(userId,currentPhone,userName){
   showModal(`
-    <div class="modal-head"><span class="modal-title">📱 Edit Mobile Number</span><button class="modal-close" onclick="openAdminPanel()">×</button></div>
+    <div class="modal-head"><span class="modal-title">📱 Edit Mobile Number</span><button class="modal-close" onclick="openAdminPanel('users')">×</button></div>
     <div class="modal-body">
       <div style="font-size:13px;color:var(--mu);margin-bottom:12px">Editing mobile number for <strong>${esc(userName||"this user")}</strong></div>
       <div class="lf" style="margin-bottom:16px">
@@ -1526,7 +1567,7 @@ function editUserPhone(userId,currentPhone,userName){
         <div style="font-size:11px;color:var(--mu);margin-top:4px">Enter in international format without + (e.g. 971501234567)</div>
       </div>
       <div class="modal-acts">
-        <button class="btn-cancel" onclick="openAdminPanel()">Cancel</button>
+        <button class="btn-cancel" onclick="openAdminPanel('users')">Cancel</button>
         <button class="btn-primary" onclick="saveUserPhone('${userId}')">Save Number</button>
       </div>
     </div>
@@ -1542,7 +1583,7 @@ async function saveUserPhone(userId){
   noloader();
   if(error){toast("Failed to save: "+error.message,"#dc2626");return;}
   toast("Mobile number saved ✓","#16a34a");
-  openAdminPanel();
+  openAdminPanel('users');
 }
 
 async function confirmReject(userId){
@@ -1553,7 +1594,7 @@ async function confirmReject(userId){
   noloader();
   if(error){toast("Failed: "+error.message,"#dc2626");return;}
   toast("User rejected and removed.","#dc2626");
-  openAdminPanel();
+  openAdminPanel('users');
 }
 
 // ═══════════════════════════════════════
