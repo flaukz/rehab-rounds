@@ -1157,7 +1157,7 @@ function renderQuickNote(p){
     {key:"slp",label:"🗣️ SLP"},
   ];
   const typeBtns=types.map(t=>`<button class="qn-type-btn${qnType===t.key?" active":""}" onclick="setQnType('${t.key}','${p.id}')">${t.label}</button>`).join("");
-  const tmpls=(NOTE_TEMPLATES[qnType]||[]).map(t=>`<button class="tmpl-chip" onclick="applyTemplate(${JSON.stringify(t.text).replace(/'/g,"&#39;")})">${t.label}</button>`).join("");
+  const tmpls=(NOTE_TEMPLATES[qnType]||[]).map((t,i)=>`<button class="tmpl-chip" onclick="applyTemplate('${qnType}',${i})">${esc(t.label)}</button>`).join("");
   document.getElementById("quick-note-panel").innerHTML=`
     <div class="qn-hdr">
       <span class="qn-title">📝 Quick Note — Room ${esc(p.room)} ${esc(maskName(p.name||""))}</span>
@@ -1183,9 +1183,10 @@ function setQnType(type,pid){
   setTimeout(()=>document.getElementById("qn-ta")?.focus(),30);
 }
 
-function applyTemplate(text){
+function applyTemplate(type,idx){
   const ta=document.getElementById("qn-ta");if(!ta)return;
-  ta.value=text;ta.focus();
+  const tmpl=NOTE_TEMPLATES[type]?.[idx];if(!tmpl)return;
+  ta.value=tmpl.text;ta.focus();
   ta.setSelectionRange(ta.value.length,ta.value.length);
 }
 
@@ -1205,7 +1206,7 @@ async function saveQuickNote(){
 // ── NOTE TEMPLATES (in main note textareas) ──────────────────
 function openTemplateMenu(type,pid){
   const tmpls=NOTE_TEMPLATES[type]||[];if(!tmpls.length)return;
-  const items=tmpls.map(t=>`<div class="tmpl-chip" style="display:block;margin-bottom:6px;text-align:left" onclick="applyNoteTemplate('${type}','${pid}',${JSON.stringify(t.text).replace(/'/g,"&#39;")})">${t.label}</div>`).join("");
+  const items=tmpls.map((t,i)=>`<button class="tmpl-chip" style="display:block;width:100%;margin-bottom:6px;text-align:left;padding:8px 14px;border-radius:8px;" onclick="applyNoteTemplate('${type}','${pid}',${i})">${esc(t.label)}</button>`).join("");
   showModal(`
     <div class="modal-head"><span class="modal-title">📋 Note Templates</span><button class="modal-close" onclick="closeModal()">×</button></div>
     <div class="modal-body" style="gap:8px">
@@ -1214,14 +1215,14 @@ function openTemplateMenu(type,pid){
     </div>`);
 }
 
-function applyNoteTemplate(type,pid,text){
+function applyNoteTemplate(type,pid,idx){
   closeModal();
+  const tmpl=NOTE_TEMPLATES[type]?.[idx];if(!tmpl)return;
   const ta=document.getElementById(`nta-${type}-${pid}`);if(!ta)return;
-  ta.value=text;
-  // Trigger the oninput logic to activate the Save button
-  updL(pid,{[type+"Notes"]:text});
+  ta.value=tmpl.text;
+  updL(pid,{[type+"Notes"]:tmpl.text});
   const btn=document.getElementById(`nsb-${type}-${pid}`);
-  if(btn)btn.className="note-save-btn"+(text.trim().length>0?" active":"");
+  if(btn)btn.className="note-save-btn active";
   ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length);
 }
 
