@@ -708,6 +708,8 @@ const p2l=(p,nm)=>({
   id:p.id,room:p.room,name:p.name,mrn:p.mrn,
   primaryPt:p.primary_pt||"",primaryOt:p.primary_ot||"",primarySlp:p.primary_slp||"",
   ptPhone:p.pt_phone||"",otPhone:p.ot_phone||"",slpPhone:p.slp_phone||"",
+  secondaryPt:p.secondary_pt||"",secondaryOt:p.secondary_ot||"",secondarySlp:p.secondary_slp||"",
+  secondaryPtPhone:p.secondary_pt_phone||"",secondaryOtPhone:p.secondary_ot_phone||"",secondarySlpPhone:p.secondary_slp_phone||"",
   classification:p.classification||"ABM",highPriority:p.high_priority||false,isUrgent:p.is_urgent||false,
   priorityById:p.priority_by||null,priorityByName:p.priority_by_name||"",
   urgentById:p.urgent_by||null,urgentByName:p.urgent_by_name||"",
@@ -830,9 +832,9 @@ function renderMain(){
         </div>
         <div class="pat-meta">
           <span>Room ${esc(p.room)}</span><span>${esc(maskMRN(p.mrn))}</span>
-          ${p.primaryPt?`<span>🦵 PT: ${esc(p.primaryPt)}</span>`:""}
-          ${p.primaryOt?`<span>🖐️ OT: ${esc(p.primaryOt)}</span>`:""}
-          ${p.primarySlp?`<span>🗣️ SLP: ${esc(p.primarySlp)}</span>`:""}
+          ${p.primaryPt?`<span>🦵 PT: ${esc(p.primaryPt)}${p.secondaryPt?` <span style="color:#b08088;font-size:11px">/ ${esc(p.secondaryPt)}</span>`:"" }</span>`:""}
+          ${p.primaryOt?`<span>🖐️ OT: ${esc(p.primaryOt)}${p.secondaryOt?` <span style="color:#b08088;font-size:11px">/ ${esc(p.secondaryOt)}</span>`:"" }</span>`:""}
+          ${p.primarySlp?`<span>🗣️ SLP: ${esc(p.primarySlp)}${p.secondarySlp?` <span style="color:#b08088;font-size:11px">/ ${esc(p.secondarySlp)}</span>`:"" }</span>`:""}
         </div>
       </div>
     </div>
@@ -852,9 +854,12 @@ function renderMain(){
         Tap a button below to send a pre-filled WhatsApp message to the therapist. The message will include the patient details and the note from the <strong>Others</strong> field.
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
-        ${p.ptPhone?`<a href="${buildWALink(p,'PT',p.primaryPt,p.ptPhone)}" target="_blank" class="wa-btn">💬 WhatsApp PT${p.primaryPt?" — "+esc(p.primaryPt):""}</a>`:""}
-        ${p.otPhone?`<a href="${buildWALink(p,'OT',p.primaryOt,p.otPhone)}" target="_blank" class="wa-btn">💬 WhatsApp OT${p.primaryOt?" — "+esc(p.primaryOt):""}</a>`:""}
-        ${p.slpPhone?`<a href="${buildWALink(p,'SLP',p.primarySlp,p.slpPhone)}" target="_blank" class="wa-btn">💬 WhatsApp SLP${p.primarySlp?" — "+esc(p.primarySlp):""}</a>`:""}
+        ${p.ptPhone?`<a href="${buildWALink(p,'PT',p.primaryPt,p.ptPhone)}" target="_blank" class="wa-btn">💬 PT${p.primaryPt?" — "+esc(p.primaryPt):""}</a>`:""}
+        ${p.secondaryPtPhone?`<a href="${buildWALink(p,'PT',p.secondaryPt,p.secondaryPtPhone)}" target="_blank" class="wa-btn" style="background:linear-gradient(135deg,#1da851,#0d7a3d)">💬 PT (2nd)${p.secondaryPt?" — "+esc(p.secondaryPt):""}</a>`:""}
+        ${p.otPhone?`<a href="${buildWALink(p,'OT',p.primaryOt,p.otPhone)}" target="_blank" class="wa-btn">💬 OT${p.primaryOt?" — "+esc(p.primaryOt):""}</a>`:""}
+        ${p.secondaryOtPhone?`<a href="${buildWALink(p,'OT',p.secondaryOt,p.secondaryOtPhone)}" target="_blank" class="wa-btn" style="background:linear-gradient(135deg,#1da851,#0d7a3d)">💬 OT (2nd)${p.secondaryOt?" — "+esc(p.secondaryOt):""}</a>`:""}
+        ${p.slpPhone?`<a href="${buildWALink(p,'SLP',p.primarySlp,p.slpPhone)}" target="_blank" class="wa-btn">💬 SLP${p.primarySlp?" — "+esc(p.primarySlp):""}</a>`:""}
+        ${p.secondarySlpPhone?`<a href="${buildWALink(p,'SLP',p.secondarySlp,p.secondarySlpPhone)}" target="_blank" class="wa-btn" style="background:linear-gradient(135deg,#1da851,#0d7a3d)">💬 SLP (2nd)${p.secondarySlp?" — "+esc(p.secondarySlp):""}</a>`:""}
       </div>
     </div>
   </div>`:""}
@@ -1163,7 +1168,7 @@ async function saveNote(pid,draftF,histF){
 }
 
 async function sendTherapistNotifications(p,noteType,noteText){
-  const therapistNames=[p.primaryPt,p.primaryOt,p.primarySlp].filter(Boolean);
+  const therapistNames=[p.primaryPt,p.secondaryPt,p.primaryOt,p.secondaryOt,p.primarySlp,p.secondarySlp].filter(Boolean);
   if(!therapistNames.length)return;
   const {data:userRows}=await db.from("user_roles").select("user_id,full_name").in("full_name",therapistNames);
   if(!userRows||!userRows.length)return;
@@ -1295,20 +1300,21 @@ function patForm(p){
     const manualOpt=cur&&!inDir?`<option value="${esc(cur)}" selected>${esc(cur)} (manual)</option>`:"";
     return blankOpt+opts+manualOpt;
   };
-  const therapistField=(disc,fieldId,phoneId,cur,phone)=>{
+  const therapistField=(disc,fieldId,phoneId,cur,phone,label='Primary')=>{
+    const roleKey=fieldId.replace('f','').replace('s','');
     if(canAssign){
       return `<div class="g2">
-        <div><label class="fl">Primary ${disc}</label>
-          <select class="fi" id="${fieldId}" onchange="onTherapistChange('${fieldId.replace('f','')}')"><${therapistOpts(disc,cur)}</select>
+        <div><label class="fl">${label} ${disc}</label>
+          <select class="fi" id="${fieldId}" onchange="onTherapistChange('${fieldId}')"><${therapistOpts(disc,cur)}</select>
         </div>
-        <div><label class="fl">${disc} WhatsApp No.</label><input class="fi" id="${phoneId}" value="${esc(phone||"")}" placeholder="Auto-filled from directory"/></div>
+        <div><label class="fl">${label} ${disc} WhatsApp</label><input class="fi" id="${phoneId}" value="${esc(phone||"")}" placeholder="Auto-filled from directory"/></div>
       </div>`;
     }else{
       return `<div class="g2">
-        <div><label class="fl">Primary ${disc}</label>
-          <input class="fi" id="${fieldId}" value="${esc(cur||"")}" readonly style="background:#f5f5f5;color:var(--mu);cursor:not-allowed;" title="Only Admin or Admin Officer can assign therapists"/>
+        <div><label class="fl">${label} ${disc}</label>
+          <input class="fi" id="${fieldId}" value="${esc(cur||"")}" readonly style="background:#f5f5f5;color:var(--mu);cursor:not-allowed;"/>
         </div>
-        <div><label class="fl">${disc} WhatsApp No.</label>
+        <div><label class="fl">${label} ${disc} WhatsApp</label>
           <input class="fi" id="${phoneId}" value="${esc(phone||"")}" readonly style="background:#f5f5f5;color:var(--mu);cursor:not-allowed;"/>
         </div>
       </div>`;
@@ -1321,9 +1327,15 @@ function patForm(p){
       <div><label class="fl">MRN</label><input class="fi" id="fm" value="${esc(v.mrn)}" placeholder="e.g. MRN-001234"/></div>
     </div>
     <div><label class="fl">Patient Name</label><input class="fi" id="fn" value="${esc(v.name)}" placeholder="Full name"/></div>
+    <div style="font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:0.07em;margin-top:4px;padding:6px 0 2px;border-top:1px solid #f0cdd1">🦵 Physical Therapy</div>
     ${therapistField("PT","fpt","fptph",v.primaryPt||"",v.ptPhone||"")}
+    ${therapistField("PT","fspt","fsptph",v.secondaryPt||"",v.secondaryPtPhone||"",'Secondary')}
+    <div style="font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:0.07em;margin-top:4px;padding:6px 0 2px;border-top:1px solid #f0cdd1">🖐️ Occupational Therapy</div>
     ${therapistField("OT","fot","fotph",v.primaryOt||"",v.otPhone||"")}
+    ${therapistField("OT","fsot","fsotph",v.secondaryOt||"",v.secondaryOtPhone||"",'Secondary')}
+    <div style="font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:0.07em;margin-top:4px;padding:6px 0 2px;border-top:1px solid #f0cdd1">🗣️ Speech-Language Pathology</div>
     ${therapistField("SLP","fslp","fslpph",v.primarySlp||"",v.slpPhone||"")}
+    ${therapistField("SLP","fsslp","fsslpph",v.secondarySlp||"",v.secondarySlpPhone||"",'Secondary')}
     </div>
     <div class="g2">
       <div><label class="fl">Ward</label><select class="fi" id="fw">${wOpts}</select></div>
@@ -1353,9 +1365,11 @@ function buildWALink(p,role,name,phone){
   const clean=phone.replace(/\D/g,"");
   return `https://wa.me/${clean}?text=${encodeURIComponent(msg)}`;
 }
-function onTherapistChange(role){
-  const nameEl=document.getElementById("f"+role);
-  const phoneEl=document.getElementById("f"+role+"ph");
+function onTherapistChange(fieldId){
+  const nameEl=document.getElementById(fieldId);
+  // Derive phone field id: fpt->fptph, fspt->fsptph, fot->fotph, fsot->fsotph etc
+  const phoneId=fieldId+"ph";
+  const phoneEl=document.getElementById(phoneId);
   if(!nameEl||!phoneEl)return;
   const name=nameEl.value;
   const staff=staffDir.find(s=>s.fullName===name);
@@ -1363,7 +1377,7 @@ function onTherapistChange(role){
     phoneEl.value=staff.phone;
     phoneEl.style.background="#f0fdf4";
     phoneEl.title="Auto-filled from Staff Directory";
-  }else if(!staff){
+  }else{
     phoneEl.value="";
     phoneEl.style.background="";
     phoneEl.title="";
@@ -1383,6 +1397,12 @@ async function subPat(eid){
   const ptPhone=canManagePatients()?document.getElementById("fptph").value.trim():(existingPat?.ptPhone||"");
   const otPhone=canManagePatients()?document.getElementById("fotph").value.trim():(existingPat?.otPhone||"");
   const slpPhone=canManagePatients()?document.getElementById("fslpph").value.trim():(existingPat?.slpPhone||"");
+  const secondaryPt=canManagePatients()?document.getElementById("fspt").value.trim():(existingPat?.secondaryPt||"");
+  const secondaryOt=canManagePatients()?document.getElementById("fsot").value.trim():(existingPat?.secondaryOt||"");
+  const secondarySlp=canManagePatients()?document.getElementById("fsslp").value.trim():(existingPat?.secondarySlp||"");
+  const secondaryPtPhone=canManagePatients()?document.getElementById("fsptph").value.trim():(existingPat?.secondaryPtPhone||"");
+  const secondaryOtPhone=canManagePatients()?document.getElementById("fsotph").value.trim():(existingPat?.secondaryOtPhone||"");
+  const secondarySlpPhone=canManagePatients()?document.getElementById("fsslpph").value.trim():(existingPat?.secondarySlpPhone||"");
   const cls=document.getElementById("fc").value,ward=document.getElementById("fw").value;
   const hp=document.getElementById("fp").value==="1",isUrgent=document.getElementById("fu").value==="1";
   if(!room){toast("Room number is required.","#dc2626");return;}
@@ -1392,6 +1412,8 @@ async function subPat(eid){
     const {error}=await db.from("patients").update({
       room,mrn,name,primary_pt:primaryPt,primary_ot:primaryOt,primary_slp:primarySlp,
       pt_phone:ptPhone,ot_phone:otPhone,slp_phone:slpPhone,
+      secondary_pt:secondaryPt,secondary_ot:secondaryOt,secondary_slp:secondarySlp,
+      secondary_pt_phone:secondaryPtPhone,secondary_ot_phone:secondaryOtPhone,secondary_slp_phone:secondarySlpPhone,
       classification:cls,high_priority:hp,is_urgent:isUrgent,ward,
       // Reset flag ownership if flags changed via form
       priority_by:hp?(S.patients.find(x=>x.id===editId)?.highPriority===hp?undefined:null):null,
@@ -1401,10 +1423,10 @@ async function subPat(eid){
       updated_at:new Date().toISOString()
     }).eq("id",editId);
     noloader();if(error){toast("Failed: "+error.message,"#dc2626");return;}
-    updL(editId,{room,mrn,name,primaryPt,primaryOt,primarySlp,ptPhone,otPhone,slpPhone,classification:cls,highPriority:hp,isUrgent,ward});
+    updL(editId,{room,mrn,name,primaryPt,primaryOt,primarySlp,ptPhone,otPhone,slpPhone,secondaryPt,secondaryOt,secondarySlp,secondaryPtPhone,secondaryOtPhone,secondarySlpPhone,classification:cls,highPriority:hp,isUrgent,ward});
     closeModal();render();toast("Patient updated ✓","#16a34a");
   }else{
-    const {data,error}=await db.from("patients").insert({room,mrn,name,primary_pt:primaryPt,primary_ot:primaryOt,primary_slp:primarySlp,pt_phone:ptPhone,ot_phone:otPhone,slp_phone:slpPhone,classification:cls,high_priority:hp,is_urgent:isUrgent,ward,checklist:DEF_CHK,equip_others:""}).select().single();
+    const {data,error}=await db.from("patients").insert({room,mrn,name,primary_pt:primaryPt,primary_ot:primaryOt,primary_slp:primarySlp,pt_phone:ptPhone,ot_phone:otPhone,slp_phone:slpPhone,secondary_pt:secondaryPt,secondary_ot:secondaryOt,secondary_slp:secondarySlp,secondary_pt_phone:secondaryPtPhone,secondary_ot_phone:secondaryOtPhone,secondary_slp_phone:secondarySlpPhone,classification:cls,high_priority:hp,is_urgent:isUrgent,ward,checklist:DEF_CHK,equip_others:""}).select().single();
     noloader();if(error){toast("Failed: "+error.message,"#dc2626");return;}
     S.patients.push(p2l(data,{}));S.selected=data.id;
     expandPatientGroup(data.id);
