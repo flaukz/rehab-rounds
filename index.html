@@ -189,6 +189,13 @@ input,select,textarea{font-family:var(--font);}
 .note-save-btn{padding:6px 18px;border-radius:8px;border:none;background:#edcacf;color:#fff;font-size:12px;font-weight:700;letter-spacing:0.03em;transition:background 0.15s;}
 .note-save-btn.active{background:linear-gradient(135deg,var(--deep),var(--mid));cursor:pointer;}
 .note-hist{border-top:1px solid #fae8ea;}
+.note-day-group{margin-bottom:4px;}
+.note-day-lbl{font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:0.07em;padding:6px 16px 4px;background:#fdf8f8;border-bottom:1px solid #f5d5d8;}
+.prev-notes-details{border:none;outline:none;}
+.prev-notes-summary{font-size:11px;font-weight:700;color:var(--mu);padding:7px 16px;cursor:pointer;list-style:none;background:#f8f4f5;border-bottom:1px solid #f0e4e6;user-select:none;}
+.prev-notes-summary::-webkit-details-marker{display:none;}
+.prev-notes-summary::before{content:"▶ ";font-size:9px;}
+details[open] .prev-notes-summary::before{content:"▼ ";}
 .note-hist-lbl{padding:8px 16px 4px;font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:0.07em;}
 .note-entry{border-top:1px solid #fdf0f1;}
 .note-entry-hdr{display:flex;align-items:center;gap:8px;padding:9px 16px;}
@@ -959,56 +966,76 @@ function rEq(p,key,lbl,icon){
 function rNS(p,type,icon,title,placeholder,replies){
   const dk=type+"Notes",hk=type+"History";
   const draft=p[dk]||"",hist=p[hk]||[],hasT=draft.trim().length>0;
-  const hHTML=hist.length===0?"":
-    `<div class="note-hist"><div class="note-hist-lbl">Saved Notes</div>
-    ${[...hist].reverse().map(n=>{
-      const el=n.editedAt?`<span class="etag">edited ${fmt(n.editedAt)}</span>`:"";
-      const reps=n.replies||[];
-      const rThread=reps.length===0?"":
-        `<div class="reply-thread">${reps.map(r=>`<div class="reply-entry">
-          <div class="reply-meta"><span>↩️</span><span class="reply-ts">Reply · ${fmt(r.ts)}</span>
-          ${r.authorName?`<span class="reply-author">${esc(r.authorName)}</span>`:""}
-          <button class="reply-del" onclick="delReply('${p.id}','${hk}','${n.id}','${r.id}')">✕ Remove</button></div>
-          <div class="reply-text">${esc(r.text)}</div>
-        </div>`).join("")}</div>`;
-      const rInp=!replies?"":
-        `<div class="reply-input" id="ri-${n.id}">
-          <textarea class="reply-ta" id="rta-${n.id}" placeholder="Write a reply…"></textarea>
-          <div class="reply-acts">
-            <button class="reply-cancel" onclick="cancelReply('${n.id}')">Cancel</button>
-            <button class="reply-post" onclick="postReply('${p.id}','${hk}','${n.id}')">Post Reply</button>
-          </div>
-        </div>`;
-      return `<div class="note-entry" id="ne-${n.id}">
-        <div class="note-entry-hdr">
-          <span class="note-ts" onclick="togView('${n.id}')">🕐 ${fmt(n.ts)}${el}</span>
-          ${n.authorName?`<span class="note-author">✍️ ${esc(n.authorName)}</span>`:""}
-          <div class="note-acts">
-            <button class="ne-btn ne-view" onclick="togView('${n.id}')" id="vbtn-${n.id}">▼ View</button>
-            ${replies?`<button class="ne-btn ne-rep" onclick="openReply('${n.id}')">💬 Reply</button>`:""}
-            <button class="ne-btn ne-edit" onclick="togEdit('${p.id}','${hk}','${n.id}')">✏️ Edit</button>
-            <button class="ne-btn ne-del" onclick="promptDel('${p.id}','${hk}','${n.id}')">🗑 Delete</button>
-          </div>
-        </div>
-        <div class="note-body" id="nb-${n.id}">${esc(n.text)}</div>
-        ${rThread}${rInp}
-        <div class="note-edit-area" id="ea-${n.id}">
-          <textarea class="note-edit-ta" id="eta-${n.id}">${esc(n.text)}</textarea>
-          <div class="note-edit-foot">
-            <button class="ne-cancel" onclick="cancelEdit('${p.id}','${hk}','${n.id}')">Cancel</button>
-            <button class="ne-save" onclick="commitEdit('${p.id}','${hk}','${n.id}')">Save Changes</button>
-          </div>
-        </div>
-        <div class="del-confirm" id="dc-${n.id}">
-          <span class="del-msg">⚠️ Delete this note permanently?</span>
-          <div class="del-acts">
-            <button class="dc-cancel" onclick="cancelDel('${n.id}')">Cancel</button>
-            <button class="dc-confirm" onclick="commitDel('${p.id}','${hk}','${n.id}')">Delete</button>
-          </div>
+  const today=new Date().toDateString();
+
+  const renderNote=n=>{
+    const el=n.editedAt?`<span class="etag">edited ${fmt(n.editedAt)}</span>`:"";
+    const reps=n.replies||[];
+    const rThread=reps.length===0?"":
+      `<div class="reply-thread">${reps.map(r=>`<div class="reply-entry">
+        <div class="reply-meta"><span>↩️</span><span class="reply-ts">Reply · ${fmt(r.ts)}</span>
+        ${r.authorName?`<span class="reply-author">${esc(r.authorName)}</span>`:""}
+        <button class="reply-del" onclick="delReply('${p.id}','${hk}','${n.id}','${r.id}')">✕ Remove</button></div>
+        <div class="reply-text">${esc(r.text)}</div>
+      </div>`).join("")}</div>`;
+    const rInp=!replies?"":
+      `<div class="reply-input" id="ri-${n.id}">
+        <textarea class="reply-ta" id="rta-${n.id}" placeholder="Write a reply…"></textarea>
+        <div class="reply-acts">
+          <button class="reply-cancel" onclick="cancelReply('${n.id}')">Cancel</button>
+          <button class="reply-post" onclick="postReply('${p.id}','${hk}','${n.id}')">Post Reply</button>
         </div>
       </div>`;
-    }).join("")}
+    return `<div class="note-entry" id="ne-${n.id}">
+      <div class="note-entry-hdr">
+        <span class="note-ts" onclick="togView('${n.id}')">🕐 ${fmt(n.ts)}${el}</span>
+        ${n.authorName?`<span class="note-author">✍️ ${esc(n.authorName)}</span>`:""}
+        <div class="note-acts">
+          <button class="ne-btn ne-view" onclick="togView('${n.id}')" id="vbtn-${n.id}">▼ View</button>
+          ${replies?`<button class="ne-btn ne-rep" onclick="openReply('${n.id}')">💬 Reply</button>`:""}
+          <button class="ne-btn ne-edit" onclick="togEdit('${p.id}','${hk}','${n.id}')">✏️ Edit</button>
+          <button class="ne-btn ne-del" onclick="promptDel('${p.id}','${hk}','${n.id}')">🗑 Delete</button>
+        </div>
+      </div>
+      <div class="note-body" id="nb-${n.id}">${esc(n.text)}</div>
+      ${rThread}${rInp}
+      <div class="note-edit-area" id="ea-${n.id}">
+        <textarea class="note-edit-ta" id="eta-${n.id}">${esc(n.text)}</textarea>
+        <div class="note-edit-foot">
+          <button class="ne-cancel" onclick="cancelEdit('${p.id}','${hk}','${n.id}')">Cancel</button>
+          <button class="ne-save" onclick="commitEdit('${p.id}','${hk}','${n.id}')">Save Changes</button>
+        </div>
+      </div>
+      <div class="del-confirm" id="dc-${n.id}">
+        <span class="del-msg">⚠️ Delete this note permanently?</span>
+        <div class="del-acts">
+          <button class="dc-cancel" onclick="cancelDel('${n.id}')">Cancel</button>
+          <button class="dc-confirm" onclick="commitDel('${p.id}','${hk}','${n.id}')">Delete</button>
+        </div>
+      </div>
     </div>`;
+  };
+
+  let hHTML="";
+  if(hist.length>0){
+    const sorted=[...hist].reverse();
+    const todayNotes=sorted.filter(n=>new Date(n.ts).toDateString()===today);
+    const prevNotes=sorted.filter(n=>new Date(n.ts).toDateString()!==today);
+    const todayHTML=todayNotes.length?`
+      <div class="note-day-group">
+        <div class="note-day-lbl">📅 Today</div>
+        ${todayNotes.map(renderNote).join("")}
+      </div>`:"";
+    const prevHTML=prevNotes.length?`
+      <div class="note-day-group">
+        <details class="prev-notes-details">
+          <summary class="prev-notes-summary">🗂 Previous Entries (${prevNotes.length})</summary>
+          ${prevNotes.map(renderNote).join("")}
+        </details>
+      </div>`:"";
+    hHTML=`<div class="note-hist"><div class="note-hist-lbl">Saved Notes</div>${todayHTML}${prevHTML}</div>`;
+  }
+
   return `<div class="note-card">
     <div class="note-hdr"><span>${icon}</span><span class="note-hdr-lbl">${title}</span>
       ${hist.length>0?`<span class="note-cnt">${hist.length} saved ${hist.length===1?"note":"notes"}</span>`:""}
@@ -1161,28 +1188,20 @@ async function saveNote(pid,draftF,histF){
   updL(pid,changes);renderMain();renderSidebar();
   if(!flagRemoved)toast("Note saved ✓","#16a34a");
 
-  // Send in-app notifications to assigned therapists for Physician & Round notes
-  if(type==="physician"||type==="round"){
-    sendTherapistNotifications(p,type,nd.text||"");
-  }
+  // Rule 1: Notify assigned therapists for ALL note types
+  sendTherapistNotifications(p,type,nd.text||"");
 }
 
 async function sendTherapistNotifications(p,noteType,noteText){
+  const NOTE_LABELS={physician:"Physician Orders",round:"Round Notes",pt:"PT Notes",ot:"OT Notes",slp:"SLP Notes"};
+  const NOTE_LABEL=NOTE_LABELS[noteType]||noteType;
   const therapistNames=[p.primaryPt,p.secondaryPt,p.primaryOt,p.secondaryOt,p.primarySlp,p.secondarySlp].filter(Boolean);
   if(!therapistNames.length)return;
   const {data:userRows}=await db.from("user_roles").select("user_id,full_name").in("full_name",therapistNames);
   if(!userRows||!userRows.length)return;
-  const NOTE_LABEL=noteType==="physician"?"Physician Orders":"Round Notes";
   const notifRows=userRows
     .filter(u=>u.user_id!==currentUser?.id)
-    .map(u=>({
-      for_user_id:u.user_id,
-      patient_id:p.id,
-      note_type:NOTE_LABEL,
-      note_text:noteText,
-      author_name:currentName,
-      is_read:false,
-    }));
+    .map(u=>({for_user_id:u.user_id,patient_id:p.id,note_type:NOTE_LABEL,note_text:noteText,author_name:currentName,is_read:false}));
   if(!notifRows.length)return;
   await db.from("notifications").insert(notifRows);
 }
@@ -1256,6 +1275,10 @@ async function postReply(pid,hk,nid){
   const p=S.patients.find(x=>x.id===pid);if(!p)return;
   updL(pid,{[hk]:(p[hk]||[]).map(n=>n.id===nid?{...n,replies:[...(n.replies||[]),rep]}:n)});
   renderMain();toast("Reply posted ✓","#16a34a");
+  // Notify assigned therapists about the reply
+  const NOTE_LABELS={physicianHistory:"Physician Orders",roundHistory:"Round Notes",ptHistory:"PT Notes",otHistory:"OT Notes",slpHistory:"SLP Notes"};
+  const noteLabel=NOTE_LABELS[hk]||hk;
+  sendTherapistNotifications(p,hk.replace("History",""),`↩️ Reply: ${t}`);
 }
 async function delReply(pid,hk,nid,rid){
   loader("Removing reply…");
