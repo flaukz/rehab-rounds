@@ -285,6 +285,32 @@ details[open] .prev-notes-summary::before{content:"▼ ";}
 .conf-msg{font-size:13px;color:var(--mu);line-height:1.6;margin-bottom:6px;}
 .conf-sub{font-size:12px;color:var(--fa);margin-bottom:24px;}
 
+/* CONFIRM DIALOGS */
+.confirm-box{padding:28px 24px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px;}
+.conf-icon{font-size:40px;line-height:1;}
+.conf-title{font-family:var(--disp);font-size:20px;color:var(--td);}
+.conf-msg{font-size:14px;color:var(--tm);line-height:1.6;}
+.conf-sub{font-size:12px;color:var(--mu);margin-top:-4px;}
+.modal-acts{display:flex;gap:10px;justify-content:flex-end;padding:0 24px 22px;flex-wrap:wrap;}
+.btn-cancel{padding:9px 20px;border-radius:9px;border:1.5px solid #edcacf;background:#fff;color:var(--mu);font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font);}
+.btn-cancel:hover{background:#fdf0f1;}
+.btn-primary{padding:9px 20px;border-radius:9px;border:none;background:linear-gradient(135deg,var(--deep),var(--mid));color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font);}
+.btn-primary:hover{opacity:0.9;}
+.btn-danger{padding:9px 20px;border-radius:9px;border:none;background:#dc2626;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font);}
+.btn-danger:hover{background:#b91c1c;}
+/* INFO BOX */
+.info-box{background:#fdf0f1;border:1px solid #f5d5d8;border-radius:10px;padding:12px 16px;font-size:12px;color:var(--tm);line-height:1.7;}
+/* ARCHIVE */
+.arc-search{padding:14px 20px 0;background:#fff;border-bottom:1px solid #f5d5d8;}
+.arc-list{overflow-y:auto;flex:1;}
+.arc-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 20px;border-bottom:1px solid #fdf0f1;}
+.arc-row:hover{background:#fdf8f8;}
+.arc-name{font-weight:600;font-size:14px;color:var(--td);}
+.arc-meta{font-size:12px;color:var(--mu);margin-top:2px;}
+.arc-ts{font-size:11px;color:var(--fa);margin-top:2px;}
+.arc-empty{padding:32px 20px;text-align:center;color:var(--mu);font-size:13px;}
+.btn-restore{padding:6px 16px;border-radius:8px;border:1.5px solid #86efac;background:#f0fdf4;color:#166534;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;font-family:var(--font);}
+.btn-restore:hover{background:#dcfce7;}
 /* USER MANAGEMENT */
 .user-table{width:100%;border-collapse:collapse;}
 .user-table th{font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:0.07em;padding:10px 16px;text-align:left;background:#fdf0f1;border-bottom:1px solid #f5d5d8;}
@@ -1181,8 +1207,20 @@ async function saveNote(pid,draftF,histF){
   const tracked=["physicianHistory","roundHistory","ptHistory","otHistory","slpHistory"];
   if(tracked.includes(histF)){
     const removedFlags=[];
-    if(p.highPriority){changes.highPriority=false;changes.priorityById=null;changes.priorityByName="";await db.from("patients").update({high_priority:false,priority_by:null,priority_by_name:"",updated_at:new Date().toISOString()}).eq("id",pid);removedFlags.push("🚩 Priority");}
-    if(p.isUrgent){changes.isUrgent=false;changes.urgentById=null;changes.urgentByName="";await db.from("patients").update({is_urgent:false,urgent_by:null,urgent_by_name:"",updated_at:new Date().toISOString()}).eq("id",pid);removedFlags.push("🔴 Urgent");}
+    if(p.highPriority){
+      changes.highPriority=false;changes.priorityById=null;changes.priorityByName="";
+      await db.from("patients").update({high_priority:false,priority_by:null,priority_by_name:"",updated_at:new Date().toISOString()}).eq("id",pid);
+      removedFlags.push("🚩 Priority");
+      const stillPri=S.patients.filter(x=>x.id!==pid).some(x=>x.highPriority);
+      if(!stillPri)collapsed.add("__pri__");
+    }
+    if(p.isUrgent){
+      changes.isUrgent=false;changes.urgentById=null;changes.urgentByName="";
+      await db.from("patients").update({is_urgent:false,urgent_by:null,urgent_by_name:"",updated_at:new Date().toISOString()}).eq("id",pid);
+      removedFlags.push("🔴 Urgent");
+      const stillUrg=S.patients.filter(x=>x.id!==pid).some(x=>x.isUrgent);
+      if(!stillUrg)collapsed.add("__urg__");
+    }
     if(removedFlags.length>0){flagRemoved=true;toast(`${removedFlags.join(" & ")} flag${removedFlags.length>1?"s":""} removed — note saved.`,"#9b2335");}
   }
   updL(pid,changes);renderMain();renderSidebar();
@@ -1274,10 +1312,33 @@ async function postReply(pid,hk,nid){
   const rep=r2l(data);
   const p=S.patients.find(x=>x.id===pid);if(!p)return;
   updL(pid,{[hk]:(p[hk]||[]).map(n=>n.id===nid?{...n,replies:[...(n.replies||[]),rep]}:n)});
-  renderMain();toast("Reply posted ✓","#16a34a");
+
+  // Remove priority/urgent flags on reply
+  const changes={};const removedFlags=[];
+  if(p.highPriority){
+    changes.highPriority=false;changes.priorityById=null;changes.priorityByName="";
+    await db.from("patients").update({high_priority:false,priority_by:null,priority_by_name:"",updated_at:new Date().toISOString()}).eq("id",pid);
+    removedFlags.push("🚩 Priority");
+    const stillPri=S.patients.filter(x=>x.id!==pid).some(x=>x.highPriority);
+    if(!stillPri)collapsed.add("__pri__");
+  }
+  if(p.isUrgent){
+    changes.isUrgent=false;changes.urgentById=null;changes.urgentByName="";
+    await db.from("patients").update({is_urgent:false,urgent_by:null,urgent_by_name:"",updated_at:new Date().toISOString()}).eq("id",pid);
+    removedFlags.push("🔴 Urgent");
+    const stillUrg=S.patients.filter(x=>x.id!==pid).some(x=>x.isUrgent);
+    if(!stillUrg)collapsed.add("__urg__");
+  }
+  if(Object.keys(changes).length)updL(pid,changes);
+
+  renderMain();renderSidebar();
+  if(removedFlags.length>0){
+    toast(`↩️ Reply posted — ${removedFlags.join(" & ")} flag${removedFlags.length>1?"s":""} removed.`,"#9b2335");
+  }else{
+    toast("Reply posted ✓","#16a34a");
+  }
+
   // Notify assigned therapists about the reply
-  const NOTE_LABELS={physicianHistory:"Physician Orders",roundHistory:"Round Notes",ptHistory:"PT Notes",otHistory:"OT Notes",slpHistory:"SLP Notes"};
-  const noteLabel=NOTE_LABELS[hk]||hk;
   sendTherapistNotifications(p,hk.replace("History",""),`↩️ Reply: ${t}`);
 }
 async function delReply(pid,hk,nid,rid){
@@ -1311,7 +1372,7 @@ function openEditModal(id){
 }
 
 function patForm(p){
-  const ie=!!p,v=p||{room:"",name:"",mrn:"",primaryPt:"",primaryOt:"",primarySlp:"",ptPhone:"",otPhone:"",slpPhone:"",classification:"ABM",highPriority:false,isUrgent:false,ward:"Ward A"};
+  const ie=!!p,v=p||{room:"",name:"",mrn:"",primaryPt:"",primaryOt:"",primarySlp:"",ptPhone:"",otPhone:"",slpPhone:"",secondaryPt:"",secondaryOt:"",secondarySlp:"",secondaryPtPhone:"",secondaryOtPhone:"",secondarySlpPhone:"",classification:"ABM",highPriority:false,isUrgent:false,ward:"Ward A"};
   const opts=CLSS.map(c=>`<option value="${c}"${c===v.classification?" selected":""}>${c}</option>`).join("");
   const wOpts=WARDS.map(w=>`<option value="${w.id}"${w.id===(v.ward||"Ward A")?" selected":""}>${w.label}</option>`).join("");
   const canAssign=canManagePatients();
@@ -1324,7 +1385,6 @@ function patForm(p){
     return blankOpt+opts+manualOpt;
   };
   const therapistField=(disc,fieldId,phoneId,cur,phone,label='Primary')=>{
-    const roleKey=fieldId.replace('f','').replace('s','');
     if(canAssign){
       return `<div class="g2">
         <div><label class="fl">${label} ${disc}</label>
@@ -1438,11 +1498,10 @@ async function subPat(eid){
       secondary_pt:secondaryPt,secondary_ot:secondaryOt,secondary_slp:secondarySlp,
       secondary_pt_phone:secondaryPtPhone,secondary_ot_phone:secondaryOtPhone,secondary_slp_phone:secondarySlpPhone,
       classification:cls,high_priority:hp,is_urgent:isUrgent,ward,
-      // Reset flag ownership if flags changed via form
-      priority_by:hp?(S.patients.find(x=>x.id===editId)?.highPriority===hp?undefined:null):null,
-      priority_by_name:hp?(S.patients.find(x=>x.id===editId)?.highPriority===hp?undefined:""):"",
-      urgent_by:isUrgent?(S.patients.find(x=>x.id===editId)?.isUrgent===isUrgent?undefined:null):null,
-      urgent_by_name:isUrgent?(S.patients.find(x=>x.id===editId)?.isUrgent===isUrgent?undefined:""):"",
+      priority_by:hp?null:null, // always reset — owner tracked via togFlag, not form
+      priority_by_name:hp?"":"",
+      urgent_by:null,
+      urgent_by_name:"",
       updated_at:new Date().toISOString()
     }).eq("id",editId);
     noloader();if(error){toast("Failed: "+error.message,"#dc2626");return;}
@@ -1509,6 +1568,7 @@ async function restorePat(id){
   const {archivedAt,...patient}=p;
   S.patients.push(patient);S.archive=S.archive.filter(x=>x.id!==id);
   S.selected=patient.id;
+  expandPatientGroup(patient.id);
   closeModal();render();toast(`${patient.name||"Room "+patient.room} restored ✓`,"#16a34a");
 }
 
@@ -1657,6 +1717,7 @@ async function loadNotifications(){
     id:n.id,patientId:n.patient_id,noteType:n.note_type,
     text:n.note_text,authorName:n.author_name,isRead:n.is_read,ts:n.created_at,
     patientRoom:(S.patients.find(x=>x.id===n.patient_id)||{}).room||"",
+    kind:(n.note_type||"").toLowerCase().includes("reply")?"reply":"note",
   }));
   updateNotifBadge();
 }
