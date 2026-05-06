@@ -464,25 +464,6 @@ details[open] .prev-notes-summary::before{content:"▼ ";}
   }
   #main.mob-visible{transform:translateX(0);}
 
-  /* BOTTOM TAB BAR */
-  #mob-tabbar{
-    display:flex;position:fixed;bottom:0;left:0;right:0;
-    height:56px;background:#fff;border-top:1.5px solid var(--border);
-    z-index:200;box-shadow:0 -4px 16px rgba(123,31,46,0.08);
-  }
-  .mob-tab{
-    flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
-    gap:2px;border:none;background:transparent;cursor:pointer;
-    color:var(--mu);font-size:9px;font-weight:600;letter-spacing:0.03em;
-    padding:6px 4px;transition:color 0.15s;
-  }
-  .mob-tab .mob-tab-icon{font-size:20px;line-height:1;}
-  .mob-tab.active{color:var(--mid);}
-  .mob-tab.active .mob-tab-icon{transform:scale(1.1);}
-  .mob-more-btn{width:100%;padding:14px 18px;border-radius:12px;border:1.5px solid var(--border);background:#fff;font-size:14px;font-weight:600;color:var(--td);text-align:left;display:flex;align-items:center;gap:10px;}
-  .mob-more-btn:hover{background:var(--pale);}
-  .mob-more-btn:active{background:var(--soft);}
-
   /* SIDEBAR MOBILE TWEAKS */
   .sidebar-hdr{padding:12px 14px;}
   .sidebar-search{padding:0 10px 10px;}
@@ -502,41 +483,21 @@ details[open] .prev-notes-summary::before{content:"▼ ";}
   .pat-card-r{flex-wrap:wrap;gap:6px;}
   .chk-items{flex-wrap:wrap;gap:8px;}
   .chk-items button{min-width:calc(50% - 4px);flex:none;}
-  .g2{grid-template-columns:1fr;}
   .modal-box{width:98vw;border-radius:14px;}
   .modal-body{padding:16px 18px;}
   .modal-acts{padding:0 18px 18px;}
-
-  /* QUICK NOTE PANEL MOBILE */
-  #quick-note-panel{left:0!important;right:0!important;bottom:56px!important;width:100%!important;border-radius:16px 16px 0 0;}
-
-  /* NOTIF PANEL MOBILE */
-  .notif-panel{left:8px!important;right:8px!important;width:auto!important;top:54px!important;}
-
-  /* NOTE CARDS MOBILE */
   .note-entry-hdr{flex-wrap:wrap;gap:4px;}
   .note-acts{flex-wrap:wrap;gap:3px;}
   .note-hdr{flex-wrap:wrap;gap:6px;}
   .chk-divider{margin:14px 0 8px;}
   .eq-grid{grid-template-columns:repeat(2,1fr);}
-
-  /* HIDE desktop-only elements on mobile */
-  .hdr-sep{display:none;}
 }
 
-/* TABLET (769–1024px) — minor adjustments */
-@media(min-width:769px) and (max-width:1024px){
-  #sidebar{width:240px;}
-  #main{padding:16px 18px;}
-  .hdr-btn{padding:5px 10px;font-size:11px;}
-  #mob-tabbar{display:none;}
-}
-
-/* DESKTOP — hide mobile-only elements */
+/* TABLET + DESKTOP — hide mobile-only elements */
 @media(min-width:769px){
-  #mob-tabbar{display:none;}
-  #sidebar{transform:none!important;}
-  #main{transform:none!important;position:relative;bottom:auto;}
+  #mob-tab-bar{display:none;}
+  #sidebar{transform:none!important;position:relative;width:300px;padding-bottom:0;}
+  #main{padding:20px 24px;}
 }
 
 .user-table{width:100%;border-collapse:collapse;}
@@ -664,18 +625,19 @@ details[open] .prev-notes-summary::before{content:"▼ ";}
 <div id="quick-note-panel" style="display:none;position:fixed;bottom:24px;left:320px;width:min(380px,calc(100vw - 340px));background:#fff;border-radius:16px;box-shadow:0 12px 40px rgba(123,31,46,0.22);border:1px solid #f0cdd1;z-index:2500;overflow:hidden;"></div>
 
 <!-- MOBILE BOTTOM TAB BAR -->
-<div id="mob-tabbar">
-  <button class="mob-tab active" id="mob-tab-list" onclick="mobTab('list')">
-    <span class="mob-tab-icon">📋</span>Patients
+<div id="mob-tab-bar">
+  <button class="mob-tab active" id="mtab-patients" onclick="mobTab('patients')">
+    <span class="tab-icon">📋</span><span>Patients</span>
   </button>
-  <button class="mob-tab" id="mob-tab-patient" onclick="mobTab('patient')">
-    <span class="mob-tab-icon">🏥</span>Dashboard
+  <button class="mob-tab" id="mtab-dashboard" onclick="mobTab('dashboard')">
+    <span class="tab-icon">🏥</span><span>Dashboard</span>
   </button>
-  <button class="mob-tab" id="mob-tab-notif" onclick="openNotifPanel()">
-    <span class="mob-tab-icon">🔔</span>Alerts
+  <button class="mob-tab" id="mtab-notif" onclick="mobTab('notif')">
+    <span class="tab-icon">🔔</span><span>Alerts</span>
+    <span class="mob-tab-badge" id="mob-notif-badge">0</span>
   </button>
-  <button class="mob-tab" id="mob-tab-more" onclick="mobTab('more')">
-    <span class="mob-tab-icon">⚙️</span>More
+  <button class="mob-tab" id="mtab-menu" onclick="mobTab('menu')">
+    <span class="tab-icon">⚙️</span><span>Menu</span>
   </button>
 </div>
 
