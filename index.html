@@ -141,6 +141,108 @@ input,select,textarea{font-family:var(--font);}
 #main{flex:1;overflow-y:auto;padding:20px 24px;}
 .empty-main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;}
 
+/* ═══════════════════════════════════════
+   MOBILE RESPONSIVE  (≤768px)
+═══════════════════════════════════════ */
+@media(max-width:768px){
+  /* Header — tighten */
+  #header{height:52px;padding:0 12px;gap:6px;}
+  .hdr-title{font-size:12px;}
+  .hdr-sub{display:none;}
+  .hdr-icon{width:28px;height:28px;font-size:15px;}
+  .hdr-date{display:none;}
+  .hdr-user{display:none;}
+  #hdr-role-badge{display:none;}
+  .hdr-btn{padding:5px 8px;font-size:11px;gap:4px;}
+  /* Hide text on small buttons, keep icons */
+  .hdr-btn#hdr-privacy-btn::after{content:"🔓";}
+  .hdr-actions{gap:4px;}
+
+  /* Body layout — stack vertically */
+  #body{flex-direction:column;position:relative;overflow:hidden;}
+
+  /* Sidebar — full width panel, slides in/out */
+  #sidebar{
+    position:absolute;
+    top:0;left:0;right:0;bottom:0;
+    width:100%;
+    z-index:100;
+    transform:translateX(-100%);
+    transition:transform 0.28s cubic-bezier(0.4,0,0.2,1);
+    border-right:none;
+    padding-bottom:70px;
+  }
+  #sidebar.mob-open{transform:translateX(0);}
+
+  /* Main — full width, padded for bottom tab bar */
+  #main{padding:14px 14px 80px;}
+  .pat-card{padding:14px 16px;}
+  .pat-card-l{gap:10px;}
+  .pat-meta{gap:6px;}
+
+  /* Quick note panel — full width bottom sheet */
+  #quick-note-panel{
+    left:0!important;right:0!important;
+    bottom:64px!important;
+    width:100%!important;
+    border-radius:16px 16px 0 0!important;
+    max-height:80vh;
+    overflow-y:auto;
+  }
+
+  /* Notification panel — full width */
+  .notif-panel{
+    top:52px;left:0;right:0;width:100%;
+    border-radius:0;max-height:70vh;
+  }
+
+  /* Modals — full width */
+  .modal{width:100%!important;max-width:100%!important;border-radius:16px 16px 0 0!important;position:fixed!important;bottom:0!important;top:auto!important;max-height:92vh;overflow-y:auto;}
+  .modal-overlay{align-items:flex-end!important;}
+
+  /* Cards — full width, less padding */
+  .chk-card,.note-card,.eq-card{border-radius:12px;margin-bottom:14px;}
+  .chk-items{gap:8px;}
+  .g2{grid-template-columns:1fr!important;}
+
+  /* Row actions — always visible on mobile (no hover) */
+  .row-acts{display:flex;position:static;margin-top:8px;}
+  .pat-row:hover .row-acts{display:flex;}
+
+  /* ── BOTTOM TAB BAR ── */
+  #mob-tab-bar{
+    display:flex;
+    position:fixed;bottom:0;left:0;right:0;
+    height:64px;
+    background:#fff;
+    border-top:1px solid #f0cdd1;
+    box-shadow:0 -4px 20px rgba(123,31,46,0.1);
+    z-index:200;
+  }
+  .mob-tab{
+    flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:3px;border:none;background:transparent;cursor:pointer;
+    font-size:9px;font-weight:700;color:var(--mu);
+    text-transform:uppercase;letter-spacing:0.05em;padding:8px 4px;
+    transition:color 0.15s;position:relative;
+  }
+  .mob-tab .tab-icon{font-size:22px;line-height:1;}
+  .mob-tab.active{color:var(--mid);}
+  .mob-tab.active::before{
+    content:"";position:absolute;top:0;left:20%;right:20%;
+    height:3px;background:linear-gradient(90deg,var(--deep),var(--mid));
+    border-radius:0 0 4px 4px;
+  }
+  .mob-tab-badge{
+    position:absolute;top:6px;right:calc(50% - 18px);
+    background:#dc2626;color:#fff;font-size:9px;font-weight:700;
+    border-radius:50%;width:16px;height:16px;
+    display:none;align-items:center;justify-content:center;line-height:1;
+  }
+}
+/* Hide tab bar on desktop */
+#mob-tab-bar{display:none;}
+
 /* PATIENT CARD */
 .pat-card{background:#fff;border-radius:14px;padding:18px 22px;border:1px solid #f5d5d8;box-shadow:var(--sh);margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;}
 .pat-card-l{display:flex;align-items:center;gap:16px;}
@@ -326,7 +428,117 @@ details[open] .prev-notes-summary::before{content:"▼ ";}
 .qn-ta{width:100%;min-height:90px;padding:10px 12px;border-radius:9px;border:1.5px solid #edcacf;outline:none;resize:vertical;font-size:13px;color:var(--tm);background:#fdf8f8;line-height:1.7;font-family:var(--font);}
 .qn-ta:focus{border-color:var(--mid);box-shadow:0 0 0 3px rgba(155,35,53,0.1);}
 .qn-footer{display:flex;justify-content:flex-end;gap:8px;}
-/* USER MANAGEMENT */
+/* ═══════════════════════════════
+   MOBILE RESPONSIVE (≤768px)
+═══════════════════════════════ */
+@media(max-width:768px){
+  /* HEADER */
+  #header{padding:10px 14px;flex-wrap:wrap;gap:8px;}
+  .hdr-brand{flex:1;min-width:0;}
+  .hdr-title{font-size:12px;}
+  .hdr-sub{display:none;}
+  .hdr-actions{gap:5px;flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px;}
+  .hdr-btn{padding:5px 9px;font-size:11px;gap:4px;white-space:nowrap;flex-shrink:0;}
+  #hdr-role-badge{font-size:9px;padding:2px 7px;}
+  .hdr-date{display:none;}
+  .hdr-user{display:none;}
+  .hdr-avatar{width:28px;height:28px;font-size:11px;}
+
+  /* BODY LAYOUT — stack vertically, sidebar becomes a panel */
+  #body{flex-direction:column;position:relative;overflow:hidden;}
+  #sidebar{
+    width:100%;height:100%;
+    border-right:none;border-bottom:none;
+    position:absolute;top:0;left:0;right:0;bottom:0;
+    z-index:10;transform:translateX(0);
+    transition:transform 0.25s ease;
+    display:flex;flex-direction:column;
+  }
+  #sidebar.mob-hidden{transform:translateX(-100%);}
+  #main{
+    width:100%;
+    position:absolute;top:0;left:0;right:0;bottom:56px;
+    overflow-y:auto;padding:14px;
+    transform:translateX(100%);
+    transition:transform 0.25s ease;
+  }
+  #main.mob-visible{transform:translateX(0);}
+
+  /* BOTTOM TAB BAR */
+  #mob-tabbar{
+    display:flex;position:fixed;bottom:0;left:0;right:0;
+    height:56px;background:#fff;border-top:1.5px solid var(--border);
+    z-index:200;box-shadow:0 -4px 16px rgba(123,31,46,0.08);
+  }
+  .mob-tab{
+    flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:2px;border:none;background:transparent;cursor:pointer;
+    color:var(--mu);font-size:9px;font-weight:600;letter-spacing:0.03em;
+    padding:6px 4px;transition:color 0.15s;
+  }
+  .mob-tab .mob-tab-icon{font-size:20px;line-height:1;}
+  .mob-tab.active{color:var(--mid);}
+  .mob-tab.active .mob-tab-icon{transform:scale(1.1);}
+  .mob-more-btn{width:100%;padding:14px 18px;border-radius:12px;border:1.5px solid var(--border);background:#fff;font-size:14px;font-weight:600;color:var(--td);text-align:left;display:flex;align-items:center;gap:10px;}
+  .mob-more-btn:hover{background:var(--pale);}
+  .mob-more-btn:active{background:var(--soft);}
+
+  /* SIDEBAR MOBILE TWEAKS */
+  .sidebar-hdr{padding:12px 14px;}
+  .sidebar-search{padding:0 10px 10px;}
+  #patient-list{padding-bottom:0;}
+  .pat-row{padding:12px 14px;}
+  .row-acts{gap:4px;}
+  .re-btn,.rq-btn{padding:5px 8px;font-size:12px;}
+  .ra-btn{padding:4px 8px;font-size:11px;}
+  .rd-btn{padding:4px 6px;font-size:12px;}
+  .sidebar-foot{padding:8px 14px;font-size:10px;}
+
+  /* MAIN MOBILE TWEAKS */
+  .pat-card{flex-direction:column;gap:10px;padding:14px;}
+  .pat-card-l{flex-direction:column;gap:8px;align-items:flex-start;}
+  .pat-avatar{width:36px;height:36px;font-size:14px;}
+  .pat-meta{gap:6px;}
+  .pat-card-r{flex-wrap:wrap;gap:6px;}
+  .chk-items{flex-wrap:wrap;gap:8px;}
+  .chk-items button{min-width:calc(50% - 4px);flex:none;}
+  .g2{grid-template-columns:1fr;}
+  .modal-box{width:98vw;border-radius:14px;}
+  .modal-body{padding:16px 18px;}
+  .modal-acts{padding:0 18px 18px;}
+
+  /* QUICK NOTE PANEL MOBILE */
+  #quick-note-panel{left:0!important;right:0!important;bottom:56px!important;width:100%!important;border-radius:16px 16px 0 0;}
+
+  /* NOTIF PANEL MOBILE */
+  .notif-panel{left:8px!important;right:8px!important;width:auto!important;top:54px!important;}
+
+  /* NOTE CARDS MOBILE */
+  .note-entry-hdr{flex-wrap:wrap;gap:4px;}
+  .note-acts{flex-wrap:wrap;gap:3px;}
+  .note-hdr{flex-wrap:wrap;gap:6px;}
+  .chk-divider{margin:14px 0 8px;}
+  .eq-grid{grid-template-columns:repeat(2,1fr);}
+
+  /* HIDE desktop-only elements on mobile */
+  .hdr-sep{display:none;}
+}
+
+/* TABLET (769–1024px) — minor adjustments */
+@media(min-width:769px) and (max-width:1024px){
+  #sidebar{width:240px;}
+  #main{padding:16px 18px;}
+  .hdr-btn{padding:5px 10px;font-size:11px;}
+  #mob-tabbar{display:none;}
+}
+
+/* DESKTOP — hide mobile-only elements */
+@media(min-width:769px){
+  #mob-tabbar{display:none;}
+  #sidebar{transform:none!important;}
+  #main{transform:none!important;position:relative;bottom:auto;}
+}
+
 .user-table{width:100%;border-collapse:collapse;}
 .user-table th{font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:0.07em;padding:10px 16px;text-align:left;background:#fdf0f1;border-bottom:1px solid #f5d5d8;}
 .user-table td{padding:11px 16px;font-size:13px;color:var(--td);border-bottom:1px solid #fdf0f1;vertical-align:middle;}
@@ -450,6 +662,23 @@ details[open] .prev-notes-summary::before{content:"▼ ";}
 <div id="toast"></div>
 <div id="notif-panel" class="notif-panel" style="display:none"></div>
 <div id="quick-note-panel" style="display:none;position:fixed;bottom:24px;left:320px;width:min(380px,calc(100vw - 340px));background:#fff;border-radius:16px;box-shadow:0 12px 40px rgba(123,31,46,0.22);border:1px solid #f0cdd1;z-index:2500;overflow:hidden;"></div>
+
+<!-- MOBILE BOTTOM TAB BAR -->
+<div id="mob-tabbar">
+  <button class="mob-tab active" id="mob-tab-list" onclick="mobTab('list')">
+    <span class="mob-tab-icon">📋</span>Patients
+  </button>
+  <button class="mob-tab" id="mob-tab-patient" onclick="mobTab('patient')">
+    <span class="mob-tab-icon">🏥</span>Dashboard
+  </button>
+  <button class="mob-tab" id="mob-tab-notif" onclick="openNotifPanel()">
+    <span class="mob-tab-icon">🔔</span>Alerts
+  </button>
+  <button class="mob-tab" id="mob-tab-more" onclick="mobTab('more')">
+    <span class="mob-tab-icon">⚙️</span>More
+  </button>
+</div>
+
 <div id="loader"><div class="loader-box"><div class="spin"></div><span id="loader-msg">Loading…</span></div></div>
 <div id="modal-overlay" class="modal-overlay" style="display:none" onclick="handleOverlayClick(event)"><div id="modal-content"></div></div>
 
@@ -689,6 +918,7 @@ async function onLogin(user){
   await loadNotifications();
   startRealtimeNotifications();
   render();
+  initMobileState();
 }
 function doLogout(){
   showModal(`<div class="confirm-box">
@@ -774,7 +1004,7 @@ function updL(id,changes){S.patients=S.patients.map(p=>p.id===id?{...p,...change
 // ═══════════════════════════════════════
 //  RENDER
 // ═══════════════════════════════════════
-function render(){renderHdr();renderSidebar();renderMain();}
+function render(){renderHdr();renderSidebar();renderMain();if(isMobile())mobTab(mobActiveTab);}
 
 function renderHdr(){
   document.getElementById("hdr-date").textContent=new Date().toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});
@@ -802,7 +1032,7 @@ function renderSidebar(){
       canWriteNotes() ? `<button class="rq-btn" onclick="event.stopPropagation();openQuickNote('${p.id}')">📝</button>` : "",
     ].join("");
     const wardTag=showWard?`<span class="${wbc(p.ward)}" style="font-size:10px;padding:1px 6px;border-radius:4px;margin-left:2px">${esc(p.ward||"Ward A")}</span>`:"";
-    return `<div class="pat-row${isAct?" active":""}" onclick="selPat('${p.id}')">
+    return `<div class="pat-row${isAct?" active":""}" onclick="mobSelPat('${p.id}')">
       <div class="row-top">
         <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
           <span class="row-room">${esc(p.room)}</span>
@@ -865,8 +1095,9 @@ function renderSidebar(){
 function renderMain(){
   const main=document.getElementById("main");
   const p=getSel();
+  const mobBack=isMobile()?`<button onclick="mobTab('list')" style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:10px;border:1.5px solid var(--border);background:#fff;font-size:13px;font-weight:600;color:var(--mid);margin-bottom:14px;">← Patient List</button>`:"";
   if(!p){
-    main.innerHTML=`<div class="empty-main" style="display:flex"><div class="big-icon" style="font-size:48px">🏥</div><p style="font-size:15px;color:var(--mu)">No patients yet.</p>${canManagePatients()?`<button class="btn-primary" style="flex:none;padding:10px 22px;border-radius:10px" onclick="openAddModal()">+ Add First Patient</button>`:""}</div>`;
+    main.innerHTML=`${mobBack}<div class="empty-main" style="display:flex"><div class="big-icon" style="font-size:48px">🏥</div><p style="font-size:15px;color:var(--mu)">Select a patient from the list.</p>${canManagePatients()?`<button class="btn-primary" style="flex:none;padding:10px 22px;border-radius:10px" onclick="openAddModal()">+ Add First Patient</button>`:""}</div>`;
     return;
   }
   const ini=p.name?p.name.split(" ").map(n=>n[0]||"").filter(Boolean).join("").slice(0,2).toUpperCase():p.room||"?";
@@ -1225,6 +1456,7 @@ function applyNoteTemplate(type,pid,idx){
   if(btn)btn.className="note-save-btn active";
   ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length);
 }
+
 
 // ═══════════════════════════════════════
 //  ACTIONS
@@ -1888,6 +2120,7 @@ function updateNotifBadge(){
     btn.style.background="";
     btn.style.borderColor="";
   }
+  syncMobBadge();
 }
 
 async function openNotifPanel(){
@@ -1996,6 +2229,81 @@ function startRealtimeNotifications(){
         }
       }
     }).subscribe();
+}
+
+// ═══════════════════════════════════════
+//  MOBILE TAB NAVIGATION
+// ═══════════════════════════════════════
+const isMobile=()=>window.innerWidth<=768;
+let mobActiveTab="patients";
+
+function mobTab(tab){
+  if(!isMobile())return;
+  mobActiveTab=tab;
+  // Update tab active states
+  ["patients","dashboard","notes","notif","menu"].forEach(t=>{
+    document.getElementById("mtab-"+t)?.classList.toggle("active",t===tab);
+  });
+  const sidebar=document.getElementById("sidebar");
+  const main=document.getElementById("main");
+  // Handle each tab
+  if(tab==="patients"){
+    sidebar?.classList.add("mob-open");
+    closeNotifPanel();closeQuickNote();
+    // Scroll patient list to top
+    document.getElementById("patient-list")?.scrollTo(0,0);
+  }else if(tab==="dashboard"){
+    sidebar?.classList.remove("mob-open");
+    closeNotifPanel();closeQuickNote();
+    main?.scrollTo(0,0);
+  }else if(tab==="notes"){
+    sidebar?.classList.remove("mob-open");
+    closeNotifPanel();closeQuickNote();
+    // Scroll to notes section
+    const noteSection=document.querySelector(".note-card");
+    if(noteSection)noteSection.scrollIntoView({behavior:"smooth"});
+  }else if(tab==="notif"){
+    sidebar?.classList.remove("mob-open");
+    openNotifPanel();
+    mobActiveTab="notif";
+    ["patients","dashboard","notes","notif","menu"].forEach(t=>{
+      document.getElementById("mtab-"+t)?.classList.toggle("active",t==="notif");
+    });
+  }else if(tab==="menu"){
+    sidebar?.classList.remove("mob-open");
+    closeNotifPanel();closeQuickNote();
+    openMobMenu();
+  }
+}
+
+function openMobMenu(){
+  const archiveCount=S.archive.length;
+  showModal(`
+    <div class="modal-head"><span class="modal-title">⚙️ Menu</span><button class="modal-close" onclick="closeModal()">×</button></div>
+    <div class="modal-body" style="gap:10px;padding:16px;">
+      <button class="btn-primary" style="width:100%;padding:14px;font-size:14px;border-radius:10px;text-align:left" onclick="closeModal();togPrivacy()">🔒 Toggle Privacy Mode</button>
+      <button class="btn-primary" style="width:100%;padding:14px;font-size:14px;border-radius:10px;text-align:left;background:linear-gradient(135deg,#7c3aed,#5b21b6)" onclick="closeModal();openArchiveModal()">🗄️ Archive ${archiveCount>0?`(${archiveCount})`:""}  </button>
+      ${canManageUsers()?`<button class="btn-primary" style="width:100%;padding:14px;font-size:14px;border-radius:10px;text-align:left;background:linear-gradient(135deg,#d97706,#b45309)" onclick="closeModal();openAdminPanel('users')">👑 Admin Panel</button>`:""}
+      ${canManagePatients()?`<button class="btn-primary" style="width:100%;padding:14px;font-size:14px;border-radius:10px;text-align:left;background:linear-gradient(135deg,#16a34a,#15803d)" onclick="closeModal();openAddModal()">➕ Add Patient</button>`:""}
+      <button class="btn-danger" style="width:100%;padding:14px;font-size:14px;border-radius:10px;text-align:left" onclick="closeModal();doLogout()">👋 Sign Out</button>
+    </div>`);
+}
+
+// Auto-select patient tab on mobile when patient is selected
+function mobSelPat(id){
+  selPat(id);
+  if(isMobile()){
+    setTimeout(()=>mobTab("dashboard"),80);
+  }
+}
+
+// Sync mobile notif badge with main badge
+function syncMobBadge(){
+  const unread=allNotifs.filter(n=>!n.isRead).length;
+  const badge=document.getElementById("mob-notif-badge");
+  if(!badge)return;
+  if(unread>0){badge.style.display="flex";badge.textContent=unread>99?"99+":unread;}
+  else badge.style.display="none";
 }
 
 // ═══════════════════════════════════════
